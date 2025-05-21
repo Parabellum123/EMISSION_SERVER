@@ -1,0 +1,16 @@
+pandas
+sqlalchemy
+psycopg2-binary
+mysql-connector-python
+python-dotenv
+geopy
+numpy
+pyspark
+django
+django-celery-beat>=2.5
+selenium
+webdriver-manager
+scikit-learn 
+matplotlib 
+seaborn
+

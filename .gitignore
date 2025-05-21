@@ -1,0 +1,15 @@
+# created by virtualenv automatically
+# Abaikan virtual environment
+venv/
+myenv/
+env/
+__pycache__/
+*.pyc
+
+# Abaikan file log dan database sementara
+*.log
+*.sqlite3
+
+# Abaikan sistem & temp file
+.DS_Store
+
