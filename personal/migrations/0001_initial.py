@@ -29,7 +29,7 @@ class Migration(migrations.Migration):
                 ('SO2', models.FloatField()),
             ],
             options={
-                'db_table': 'emission_output7',
+                'db_table': 'emission_output_final',
             },
         ),
     ]

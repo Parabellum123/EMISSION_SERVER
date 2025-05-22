@@ -42,8 +42,7 @@ def calculate_emissions(start_date, end_date):
         # 1️⃣ Load cleaned_trajectory_segments
         query_segment = f"""
         (SELECT * FROM cleaned_trajectory_segments
-         WHERE start_time BETWEEN '{start_date}' AND '{end_date}') AS seg
-        """
+        WHERE start_time BETWEEN '{start_date}' AND '{end_date}') AS seg        """
         segments_df = spark.read.jdbc(url=JDBC_URL, table=query_segment, properties=CONNECTION_PROPERTIES)
 
         # 2️⃣ Load output_design_speed

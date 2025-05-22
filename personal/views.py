@@ -8,20 +8,21 @@ import subprocess
 import os
 import psycopg2
 
+
 def home(request):
     return render(request, 'base.html')
 
 def run_calculation(request):
     start_date_str = request.GET.get('start_date')
     end_date_str = request.GET.get('end_date')
+    
+    from datetime import datetime
 
-  # 🔹 1. Jalankan Scraper sebelum kalkulasi
-    try:
-        scraper_script = os.path.join(os.path.dirname(__file__), '../baltic_scraper/baltic_scraper/spiders/vessel.py')
-        subprocess.run(["python", scraper_script], check=True)
-        print("Scraping selesai sebelum kalkulasi.")
-    except Exception as e:
-        print(f"Error menjalankan scraper: {e}")
+    # Format dari frontend: MM/DD/YYYY → ubah ke YYYY-MM-DD
+    start_date_obj = datetime.strptime(start_date_str, '%m/%d/%Y')
+    end_date_obj = datetime.strptime(end_date_str, '%m/%d/%Y')
+    start_date_str = start_date_obj.strftime('%Y-%m-%d')
+    end_date_str = end_date_obj.strftime('%Y-%m-%d')
 
 
     # Run the calculations and get the AIS data count
@@ -39,7 +40,7 @@ def run_calculation(request):
     # Fetch the candlestick data
     candlestick_data = fetch_candlestick_data()
 
-    # Count unique MMSI values from emission_output7 table
+    # Count unique MMSI values from emission_output_final table
     unique_mmsi_count = count_unique_mmsi()
 
     # Log the unique MMSI count
@@ -48,8 +49,8 @@ def run_calculation(request):
     # Fetch the total emissions data from the total_emission table
     total_emissions = fetch_total_emissions()
 
-    total_sum = sum(total_emissions.values())
-    emission_percentages = {emission: (value / total_sum) * 100 for emission, value in total_emissions.items()}
+    total_sum = sum([v or 0 for v in total_emissions.values()]) or 1
+    emission_percentages = {emission: ((value or 0) / total_sum) * 100 for emission, value in total_emissions.items()}
 
     # Prepare data for charts
     exampleDates = [entry['date'] for entry in total_daily_data]
@@ -70,11 +71,30 @@ def run_calculation(request):
     # Fetch unique MMSI options
     mmsi_options = fetch_unique_mmsi_options()
 
-    # Render partial templates with fetched data
-    total_emissions_html = render_to_string('partials/total_emissions.html', {'results': results})
-    emission_table_html = render_to_string('partials/emission_table.html', {'results': emission_output_data})
-    selected_mmsi_table_html = render_to_string('partials/selected_mmsi_table.html', {'results': results})
-    mmsi_options_html = render_to_string('partials/mmsi_options.html', {'mmsi_options': mmsi_options})
+    # Render partial templates with fetched data (with error handling)
+    try:
+        total_emissions_html = render_to_string('partials/total_emissions.html', {'results': results})
+    except Exception as e:
+        print(f"[ERROR] Gagal render total_emissions.html: {e}")
+        total_emissions_html = "<div>Gagal memuat data total emissions.</div>"
+
+    try:
+        emission_table_html = render_to_string('partials/emission_table.html', {'results': emission_output_data})
+    except Exception as e:
+        print(f"[ERROR] Gagal render emission_table.html: {e}")
+        emission_table_html = "<div>Gagal memuat data emission table.</div>"
+
+    try:
+        selected_mmsi_table_html = render_to_string('partials/selected_mmsi_table.html', {'results': results})
+    except Exception as e:
+        print(f"[ERROR] Gagal render selected_mmsi_table.html: {e}")
+        selected_mmsi_table_html = "<div>Gagal memuat data selected MMSI table.</div>"
+
+    try:
+        mmsi_options_html = render_to_string('partials/mmsi_options.html', {'mmsi_options': mmsi_options})
+    except Exception as e:
+        print(f"[ERROR] Gagal render mmsi_options.html: {e}")
+        mmsi_options_html = "<div>Gagal memuat pilihan MMSI.</div>"
 
     return JsonResponse({
         'total_emissions_html': total_emissions_html,
@@ -124,7 +144,7 @@ def fetch_points_data(request):
         query = """
         SELECT mmsi, vessel_type, start_timestamp, start_latitude, start_longitude,
                CO2, NOX, CO, NMVOC, PM, SO2
-        FROM emission_output7
+        FROM emission_output_final
         WHERE mmsi = %s
         ORDER BY start_timestamp ASC
         """
@@ -133,7 +153,7 @@ def fetch_points_data(request):
         query = """
         SELECT mmsi, vessel_type, start_timestamp, start_latitude, start_longitude,
                CO2, NOX, CO, NMVOC, PM, SO2
-        FROM emission_output7
+        FROM emission_output_final
         ORDER BY start_timestamp ASC
         """
         cursor.execute(query)
@@ -200,28 +220,34 @@ def fetch_ship_data(mmsi):
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # First, try to get the data where length is greater than width
+        # Coba ambil data kapal dengan kondisi panjang > lebar (optional logic)
         query = """
-        SELECT mmsi, name, imo, vessel_type, length, width
-        FROM tanker_20
-        WHERE mmsi = %s AND length > width
-        GROUP BY mmsi, name, imo, vessel_type, length, width
+        SELECT mmsi, imo_number, vessel_name, vessel_type, length, breadth AS width, draught,
+               engine_type, engine_model, engine_power, deadweight
+        FROM vessel_data
+        WHERE mmsi = %s AND length > breadth
         LIMIT 1
         """
         cursor.execute(query, (mmsi,))
-        result = cursor.fetchone()
+        row = cursor.fetchone()
 
-        # If no such data is found, fallback to any available data
-        if not result:
+        if not row:
+            # Fallback jika tidak ditemukan
             query = """
-            SELECT mmsi, name, imo, vessel_type, length, width
-            FROM tanker_20
+            SELECT mmsi, imo_number, vessel_name, vessel_type, length, breadth AS width, draught,
+                   engine_type, engine_model, engine_power, deadweight
+            FROM vessel_data
             WHERE mmsi = %s
-            GROUP BY mmsi, name, imo, vessel_type, length, width
             LIMIT 1
             """
             cursor.execute(query, (mmsi,))
-            result = cursor.fetchone()
+            row = cursor.fetchone()
+
+        if row:
+            columns = [desc[0] for desc in cursor.description]
+            result = dict(zip(columns, row))
+        else:
+            result = {}
     finally:
         cursor.close()
         conn.close()
@@ -292,7 +318,7 @@ def fetch_unique_mmsi_options():
 
     query = """
     SELECT DISTINCT mmsi
-    FROM emission_output7
+    FROM emission_output_final
     """
     cursor.execute(query)
     results = cursor.fetchall()
@@ -314,7 +340,7 @@ def count_unique_mmsi():
 
     query = """
     SELECT COUNT(DISTINCT mmsi) as unique_mmsi_count
-    FROM emission_output7
+    FROM emission_output_final
     """
     cursor.execute(query)
     result = cursor.fetchone()
@@ -342,7 +368,7 @@ def fetch_results_from_db(start_date_str, end_date_str):
     query = """
     SELECT mmsi, vessel_type, start_timestamp, start_latitude, start_longitude,
            end_timestamp, CO2, NOX, CO, NMVOC, PM, SO2
-    FROM emission_output7
+    FROM emission_output_final
     WHERE start_timestamp BETWEEN %s AND %s
     """
     cursor.execute(query, (start_date_str, end_date_str))
@@ -369,7 +395,7 @@ def fetch_emission_output_data():
            TO_CHAR(start_timestamp, 'YYYY-MM-DD HH24:MI:SS') as start_timestamp, 
            TO_CHAR(end_timestamp, 'YYYY-MM-DD HH24:MI:SS') as end_timestamp, 
            CO2, NOX, CO, NMVOC, PM, SO2
-    FROM emission_output7
+    FROM emission_output_final
     ORDER BY start_timestamp ASC
     """
     cursor.execute(query)

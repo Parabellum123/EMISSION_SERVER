@@ -17,4 +17,4 @@ class EmissionOutput(models.Model):
     SO2 = models.FloatField()
 
     class Meta:
-        db_table = 'emission_output7'
+        db_table = 'emission_output_final'

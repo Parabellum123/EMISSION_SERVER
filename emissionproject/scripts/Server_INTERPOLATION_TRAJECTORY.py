@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import datetime
 from geopy.distance import geodesic
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import psycopg2
 
 def is_valid_coord(lat, lon):
@@ -72,10 +72,13 @@ def process_and_clean_ais_data(start_date_str, end_date_str):
         print("Tidak ada data hasil yang bisa disimpan.")
     else:
         try:
-            result_df.to_sql("cleaned_trajectory_segments", con=engine, if_exists='replace', index=False)
-            print("Data berhasil disimpan ke tabel cleaned_trajectory_segments (di server).")
+            # Hapus isinya saja tanpa DROP TABLE
+            with engine.begin() as connection:
+                connection.execute(text("DELETE FROM cleaned_trajectory_segments"))
+            result_df.to_sql("cleaned_trajectory_segments", con=engine, if_exists='append', index=False)
+            print("✅ Data berhasil disimpan ke tabel cleaned_trajectory_segments (tanpa drop table).")
         except Exception as e:
-            print(f"Gagal menyimpan ke PostgreSQL: {e}")
+            print(f"❌ Gagal menyimpan ke PostgreSQL: {e}")
 
     conn.close()
 
@@ -88,4 +91,4 @@ if __name__ == "__main__":
         process_and_clean_ais_data(start_date_str, end_date_str)
         print("✅ Interpolasi selesai.")
     else:
-        print("❌ Argumen tanggal tidak lengkap. Contoh: python Server_INTERPOLATION_TRAJECTORY.py 2025-04-23 2025-04-25")
+        print("❌ Argumen tanggal tidak lengkap. Contoh: python Server_INTERPOLATION_TRAJECTORY.py 2025-03-01 2025-04-30")

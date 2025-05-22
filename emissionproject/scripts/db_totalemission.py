@@ -10,20 +10,18 @@ def main():
 
     engine = create_engine(f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}")
 
-    # Read the emission data from the database
-    query = 'SELECT CO2, NOX, CO, NMVOC, PM, SO2 FROM emission_output7'
+    # ✅ Perbaikan kutip ganda
+    query = 'SELECT "CO2", "NOX", "CO", "NMVOC", "PM", "SO2" FROM emission_output_final'
     df = pd.read_sql(query, engine)
 
-    # Calculate the total emission for each emission type
+    # Hitung total emisi
     total_emissions = df.sum().round(3).reset_index()
-
-    # Rename columns to match the output table format
     total_emissions.columns = ['emission_type', 'total']
 
-    # Export the result to a new table in the same database
+    # Simpan hasil ke tabel total_emission
     total_emissions.to_sql('total_emission', engine, if_exists='replace', index=False)
 
-    print('Total emissions calculated and exported successfully.')
+    print('✅ Total emissions calculated and exported successfully.')
 
 if __name__ == "__main__":
     main()
