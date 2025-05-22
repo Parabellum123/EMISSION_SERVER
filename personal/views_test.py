@@ -2,8 +2,8 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from django.template.loader import render_to_string
-from scripts.calculations import run_scripts
-from scripts.calculateselect import run_filter
+from emissionproject.scripts.calculations import run_scripts
+from emissionproject.scripts.calculateselect import run_filter
 import mysql.connector
 import subprocess
 import os

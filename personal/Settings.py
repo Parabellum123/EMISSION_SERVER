@@ -1,22 +1,17 @@
 """
-Django settings for emissionsite project.
+Django settings for emissionsite project (PostgreSQL version).
 """
 
 import os
-import pymysql
 from pathlib import Path
 from dotenv import load_dotenv
 
 # ✅ Load environment variables dari .env
 dotenv_path = Path(__file__).resolve().parent.parent / ".env"
-
 if dotenv_path.exists():
     load_dotenv(dotenv_path)
 else:
     print("⚠ WARNING: File .env tidak ditemukan!")
-
-# ✅ Install MySQL DB adapter
-pymysql.install_as_MySQLdb()
 
 # ✅ Path proyek
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -28,7 +23,7 @@ ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split('
 
 # ✅ Aplikasi yang digunakan
 INSTALLED_APPS = [
-    'personal',  # Aplikasi utama proyek
+    'personal',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -67,29 +62,25 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'emissionsite.wsgi.application'
 
-# ✅ Database Configuration (MySQL)
-MYSQL_DB = os.getenv('MYSQL_DATABASE')
-MYSQL_USER = os.getenv('MYSQL_USER')
-MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD')
-MYSQL_HOST = os.getenv('MYSQL_HOST', '127.0.0.1')
-MYSQL_PORT = int(os.getenv('MYSQL_PORT', 3306))  # ✅ Ubah ke INT agar tidak error
+# ✅ Database Configuration (PostgreSQL)
+POSTGRES_DB = os.getenv('POSTGRES_DB')
+POSTGRES_USER = os.getenv('POSTGRES_USER')
+POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD')
+POSTGRES_HOST = os.getenv('POSTGRES_HOST', '127.0.0.1')
+POSTGRES_PORT = int(os.getenv('POSTGRES_PORT', 5432))
 
-# ✅ Cek apakah semua variabel sudah diambil dari .env
-if not all([MYSQL_DB, MYSQL_USER, MYSQL_PASSWORD, MYSQL_HOST, MYSQL_PORT]):
-    raise ValueError("🚨 ERROR: Pastikan semua variabel database ada di .env!")
+if not all([POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_PORT]):
+    raise ValueError("🚨 ERROR: Pastikan semua variabel PostgreSQL ada di .env!")
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': MYSQL_DB,
-        'USER': MYSQL_USER,
-        'PASSWORD': MYSQL_PASSWORD,
-        'HOST': MYSQL_HOST,
-        'PORT': MYSQL_PORT,
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
-        },
-        'CONN_MAX_AGE': 600,  # ✅ Simpan koneksi agar lebih cepat
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': POSTGRES_DB,
+        'USER': POSTGRES_USER,
+        'PASSWORD': POSTGRES_PASSWORD,
+        'HOST': POSTGRES_HOST,
+        'PORT': POSTGRES_PORT,
+        'CONN_MAX_AGE': 600,
     }
 }
 
