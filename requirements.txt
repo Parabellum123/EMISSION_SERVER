@@ -1,16 +1,36 @@
+# Core Python libs
 pandas
-sqlalchemy
-psycopg2-binary
-mysql-connector-python
-python-dotenv
-geopy
 numpy
-pyspark
-django
-django-celery-beat>=2.5
-selenium
-webdriver-manager
-scikit-learn 
-matplotlib 
+matplotlib
 seaborn
 
+# Machine Learning
+scikit-learn
+
+# Web
+django
+django-celery-beat>=2.5
+whitenoise
+
+# Database
+sqlalchemy
+psycopg2-binary
+python-dotenv
+
+# Web scraping
+scrapy
+itemadapter
+selenium
+webdriver-manager
+
+# Spark
+pyspark
+
+# Geolocation
+geopy
+
+# Celery & broker
+redis
+
+# WSGI Server (optional production)
+gunicorn

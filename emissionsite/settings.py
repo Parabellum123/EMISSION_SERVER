@@ -6,21 +6,20 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# ✅ Load .env
+# Load environment variables
 load_dotenv()
 
-# ✅ Path dasar proyek
+# Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ✅ Keamanan
+# Keamanan dasar
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-default-key')
-DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
 
-# ✅ Aplikasi yang digunakan
+# Aplikasi Django
 INSTALLED_APPS = [
     'personal',
-    'baltic_scraper',
     'django_celery_beat',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -30,7 +29,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 ]
 
-# ✅ Middleware
+# Middleware
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -41,9 +40,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# ✅ URL dan Template
+# Routing
 ROOT_URLCONF = 'emissionsite.urls'
 
+# Template engine
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -62,25 +62,25 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'emissionsite.wsgi.application'
 
-# ✅ Konfigurasi Database PostgreSQL
+# PostgreSQL database config (via .env)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('POSTGRES_DB', 'emissionprojectdb'),
         'USER': os.getenv('POSTGRES_USER', 'postgres'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
-        'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'Achmadriadi@123'),
+        'HOST': os.getenv('POSTGRES_HOST', '156.67.216.241'),
         'PORT': os.getenv('POSTGRES_PORT', 5432),
         'CONN_MAX_AGE': 600,
     }
 }
 
-# ✅ Celery + Redis (untuk scraping otomatis)
+# Celery + Redis (untuk task schedule / background job)
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
-# ✅ Validasi password
+# Validasi password
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -88,19 +88,27 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# ✅ Internasionalisasi
+# Lokalisasi
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Jakarta'
 USE_I18N = True
 USE_TZ = True
 
-# ✅ Static dan media
+# File statis (CSS, JS, dll.)
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# File media (upload user)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# ✅ Default field
+# Primary key default
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Keamanan tambahan saat production
+if not DEBUG:
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True

@@ -78,3 +78,14 @@ def process_and_clean_ais_data(start_date_str, end_date_str):
             print(f"Gagal menyimpan ke PostgreSQL: {e}")
 
     conn.close()
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) == 3:
+        start_date_str = sys.argv[1]
+        end_date_str = sys.argv[2]
+        print(f"🔧 Memproses AIS dari {start_date_str} ke {end_date_str}")
+        process_and_clean_ais_data(start_date_str, end_date_str)
+        print("✅ Interpolasi selesai.")
+    else:
+        print("❌ Argumen tanggal tidak lengkap. Contoh: python Server_INTERPOLATION_TRAJECTORY.py 2025-04-23 2025-04-25")

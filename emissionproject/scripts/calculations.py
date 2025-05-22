@@ -1,12 +1,12 @@
 # scripts/calculations.py
 
-from scripts import server_output_mcr_aux_power as db_MCR_Aux_power
-from scripts import server_desing_speed as db_designspeed
-from scripts import Server_INTERPOLATION_TRAJECTORY as db_sailing_times
-from scripts import Server_interpolate_position_segments as db_sailing_speed
-from scripts import Server_calculate_emissions as db_emission_calculation
-from scripts import db_totaldaily
-from scripts import db_totalemission
+from emissionproject.scripts import server_output_mcr_aux_power as db_MCR_Aux_power
+from emissionproject.scripts import server_desing_speed as db_designspeed
+from emissionproject.scripts import Server_INTERPOLATION_TRAJECTORY as db_sailing_times
+from emissionproject.scripts import Server_interpolate_position_segments as db_sailing_speed
+from emissionproject.scripts import Server_calculate_emissions as db_emission_calculation
+from emissionproject.scripts import db_totaldaily
+from emissionproject.scripts import db_totalemission
 from datetime import datetime
 
 def run_scripts(start_date_str, end_date_str):
@@ -19,7 +19,7 @@ def run_scripts(start_date_str, end_date_str):
     print("✅ Design Speed completed.")
 
     print("▶️ Running Server_INTERPOLATION_TRAJECTORY.py...")
-    db_sailing_times.process_and_clean_ais_data()
+    db_sailing_times.process_and_clean_ais_data(start_date_str, end_date_str)
     print("✅ Cleaned Trajectory Segments completed.")
     
     print("▶️ Running Server_interpolate_position_segments.py...")

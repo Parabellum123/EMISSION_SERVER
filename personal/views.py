@@ -4,9 +4,9 @@ from django.views.decorators.http import require_GET
 from django.template.loader import render_to_string
 from emissionproject.scripts.calculations import run_scripts
 from emissionproject.scripts.calculateselect import run_filter
-import mysql.connector
 import subprocess
 import os
+import psycopg2
 
 def home(request):
     return render(request, 'base.html')
@@ -110,11 +110,12 @@ def run_calculation(request):
 @require_GET
 def fetch_points_data(request):
     mmsi = request.GET.get('mmsi')
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
     )
 
     cursor = conn.cursor(dictionary=True)
@@ -188,11 +189,12 @@ def filter_mmsi(request):
         return JsonResponse({'error': 'MMSI not provided'}, status=400)
 
 def fetch_ship_data(mmsi):
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
     )
 
     cursor = conn.cursor(dictionary=True)
@@ -227,19 +229,20 @@ def fetch_ship_data(mmsi):
     return result if result else {}
 
 def fetch_mmsi_emission_data():
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
     )
 
     cursor = conn.cursor(dictionary=True)
 
     query = """
     SELECT mmsi, 
-           DATE_FORMAT(start_timestamp, '%Y-%m-%d %H:%i:%s') as start_timestamp, 
-           DATE_FORMAT(end_timestamp, '%Y-%m-%d %H:%i:%s') as end_timestamp, 
+           TO_CHAR(start_timestamp, 'YYYY-MM-DD HH24:MI:SS') as start_timestamp, 
+           TO_CHAR(end_timestamp, 'YYYY-MM-DD HH24:MI:SS') as end_timestamp, 
            start_latitude, start_longitude, CO2, NOX, CO, NMVOC, PM, SO2
     FROM select_emission
     ORDER BY start_timestamp ASC
@@ -253,11 +256,12 @@ def fetch_mmsi_emission_data():
     return results
 
 def fetch_mmsi_total_emissions():
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
     )
 
     cursor = conn.cursor(dictionary=True)
@@ -275,12 +279,14 @@ def fetch_mmsi_total_emissions():
     return results
 
 def fetch_unique_mmsi_options():
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
-    )
+    conn = psycopg2.connect(
+    dbname="emissionprojectdb",
+    user="postgres",
+    password="Achmadriadi@123",
+    host="156.67.216.241",
+    port="5432"
+)
+
 
     cursor = conn.cursor(dictionary=True)
 
@@ -297,13 +303,13 @@ def fetch_unique_mmsi_options():
     return results
 
 def count_unique_mmsi():
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
     )
-
     cursor = conn.cursor()
 
     query = """
@@ -323,11 +329,12 @@ def count_unique_mmsi():
     return unique_mmsi_count
 
 def fetch_results_from_db(start_date_str, end_date_str):
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
     )
 
     cursor = conn.cursor(dictionary=True)
@@ -347,19 +354,20 @@ def fetch_results_from_db(start_date_str, end_date_str):
     return results
 
 def fetch_emission_output_data():
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
     )
 
     cursor = conn.cursor(dictionary=True)
 
     query = """
     SELECT mmsi, vessel_type, 
-           DATE_FORMAT(start_timestamp, '%Y-%m-%d %H:%i:%s') as start_timestamp, 
-           DATE_FORMAT(end_timestamp, '%Y-%m-%d %H:%i:%s') as end_timestamp, 
+           TO_CHAR(start_timestamp, 'YYYY-MM-DD HH24:MI:SS') as start_timestamp, 
+           TO_CHAR(end_timestamp, 'YYYY-MM-DD HH24:MI:SS') as end_timestamp, 
            CO2, NOX, CO, NMVOC, PM, SO2
     FROM emission_output7
     ORDER BY start_timestamp ASC
@@ -373,11 +381,12 @@ def fetch_emission_output_data():
     return results
 
 def fetch_total_daily_data():
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
     )
 
     cursor = conn.cursor(dictionary=True)
@@ -401,11 +410,12 @@ def fetch_total_daily_data():
     return results
 
 def fetch_total_emissions():
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
     )
 
     cursor = conn.cursor(dictionary=True)
@@ -426,11 +436,12 @@ def fetch_total_emissions():
     return total_emissions
 
 def fetch_mmsi_daily_emissions(mmsi):
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
     )
 
     cursor = conn.cursor(dictionary=True)
@@ -450,11 +461,12 @@ def fetch_mmsi_daily_emissions(mmsi):
     return results
 
 def calculate_mmsi_average_emissions(mmsi):
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
     )
 
     cursor = conn.cursor(dictionary=True)
@@ -479,11 +491,12 @@ def calculate_mmsi_average_emissions(mmsi):
     return result
 
 def fetch_candlestick_data():
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="andi123",
-        database="shipparameterdb"
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
     )
 
     cursor = conn.cursor(dictionary=True)
