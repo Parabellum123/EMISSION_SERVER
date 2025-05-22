@@ -1,0 +1,15 @@
+{% for result in results %}
+    <tr>
+        <td class="px-4 py-2">{{ result.mmsi }}</td>
+        <td class="px-4 py-2">{{ result.start_timestamp }}</td>
+        <td class="px-4 py-2">{{ result.end_timestamp }}</td>
+        <td class="px-4 py-2">{{ result.start_latitude }}</td>
+        <td class="px-4 py-2">{{ result.start_longitude }}</td>
+        <td class="px-4 py-2">{{ result.CO2 }}</td>
+        <td class="px-4 py-2">{{ result.NOX }}</td>
+        <td class="px-4 py-2">{{ result.CO }}</td>
+        <td class="px-4 py-2">{{ result.NMVOC }}</td>
+        <td class="px-4 py-2">{{ result.PM }}</td>
+        <td class="px-4 py-2">{{ result.SO2 }}</td>
+    </tr>
+{% endfor %}

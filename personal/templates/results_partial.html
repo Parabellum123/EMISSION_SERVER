@@ -1,0 +1,81 @@
+<!-- src/personal/templates/results_partial.html -->
+<div class="flex">
+    <div class="w-3/5">
+        <div id="map" class="rounded-lg"></div>
+    </div>
+    <div class="w-2/5 flex flex-col space-y-4">
+        <div id="total-emissions">
+            <!-- Total emissions data -->
+            {% for emission in results %}
+            <p>{{ emission.CO2 }} CO2, {{ emission.NOX }} NOX, {{ emission.CO }} CO, {{ emission.NMVOC }} NMVOC, {{ emission.PM }} PM, {{ emission.SO2 }} SO2</p>
+            {% endfor %}
+        </div>
+        <div id="emission-percentage-chart"></div>
+        <div id="average-emissions"></div>
+    </div>
+</div>
+<div id="emission-table">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead>
+            <tr>
+                <th class="px-4 py-2 text-left">MMSI</th>
+                <th class="px-4 py-2 text-left">Start Timestamp</th>
+                <th class="px-4 py-2 text-left">End Timestamp</th>
+                <th class="px-4 py-2 text-right">CO2</th>
+                <th class="px-4 py-2 text-right">NOX</th>
+                <th class="px-4 py-2 text-right">CO</th>
+                <th class="px-4 py-2 text-right">NMVOC</th>
+                <th class="px-4 py-2 text-right">PM</th>
+                <th class="px-4 py-2 text-right">SO2</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {% for emission in results %}
+            <tr>
+                <td class="px-4 py-2">{{ emission.mmsi }}</td>
+                <td class="px-4 py-2">{{ emission.start_timestamp }}</td>
+                <td class="px-4 py-2">{{ emission.end_timestamp }}</td>
+                <td class="px-4 py-2 text-right">{{ emission.CO2 }}</td>
+                <td class="px-4 py-2 text-right">{{ emission.NOX }}</td>
+                <td class="px-4 py-2 text-right">{{ emission.CO }}</td>
+                <td class="px-4 py-2 text-right">{{ emission.NMVOC }}</td>
+                <td class="px-4 py-2 text-right">{{ emission.PM }}</td>
+                <td class="px-4 py-2 text-right">{{ emission.SO2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<div class="mt-8 grid grid-cols-3 gap-4">
+    <canvas id="co2-chart"></canvas>
+    <canvas id="nox-chart"></canvas>
+    <canvas id="co-chart"></canvas>
+    <canvas id="nmvoc-chart"></canvas>
+    <canvas id="pm-chart"></canvas>
+    <canvas id="so2-chart"></canvas>
+</div>
+<div>
+    <select id="select-mmsi">
+        {% for emission in results %}
+        <option value="{{ emission.mmsi }}">{{ emission.mmsi }}</option>
+        {% endfor %}
+    </select>
+    <div id="selected-total-emission"></div>
+    <div id="selected-average-emission"></div>
+    <table id="selected-mmsi-emission-table">
+        <thead>
+            <tr>
+                <th>Emission Type</th>
+                <th>Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for emission in results %}
+            <tr>
+                <td>{{ emission.mmsi }}</td>
+                <td>{{ emission.CO2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ship Emission Monitoring</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" rel="stylesheet">
+    <style>
+        /* Custom height for the map and summary sections */
+        #map {
+            height: 51.5rem; /* Adjusted height to make space for the summary sections */
+        }
+        .summary-section {
+            height: 16rem; /* Adjusted height for Total Emissions */
+        }
+        .emission-chart-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-grow: 1;
+        height: 93%;
+        }
+        .emission-chart {
+            width: 50%;
+            height: auto;
+        }
+        .legend {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* 2 columns */
+            grid-gap: 8px;
+            padding-left: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+        }
+        .chart-container {
+            width: 100%;
+            height: 12rem; /* 192px */
+        }
+        .control-section {
+            flex: 1;
+        }
+        .table-container {
+            max-height: 300px; /* Adjust the height as needed */
+            overflow-y: auto;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: left; /* Align headers to the left */
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        .chart-container {
+        width: 100%;
+        height: 20rem; /* Increase height to 320px */
+        }
+        .candlestick-chart-container {
+        height: calc(100%); /* Increase height by 50px */
+        }
+        
+        /* Custom CSS for daterangepicker */
+        .daterangepicker {
+            background: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 0.25rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .daterangepicker .drp-calendar {
+            background: #ffffff;
+        }
+        .daterangepicker .drp-calendar.left, 
+        .daterangepicker .drp-calendar.right {
+            width: 100%;
+            max-width: none;
+        }
+        .daterangepicker .drp-calendar.left .calendar-table, 
+        .daterangepicker .drp-calendar.right .calendar-table {
+            width: 100%;
+            table-layout: fixed;
+        }
+        .daterangepicker .drp-calendar .calendar-table th,
+        .daterangepicker .drp-calendar .calendar-table td {
+            text-align: center;
+            vertical-align: middle;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+        }
+        .daterangepicker .drp-calendar .calendar-table td.available:hover {
+            background: #f0f0f0;
+        }
+        .daterangepicker .ranges {
+            background: #f8f9fa;
+            border-top: 1px solid #ddd;
+        }
+        .daterangepicker .ranges ul {
+            padding: 0.5rem;
+        }
+        .daterangepicker .ranges li {
+            margin-bottom: 0.25rem;
+        }
+        .daterangepicker .drp-buttons {
+            background: #f8f9fa;
+            border-top: 1px solid #ddd;
+            padding: 0.5rem;
+            text-align: right;
+        }
+        .daterangepicker .drp-buttons .btn {
+            margin-left: 0.5rem;
+        }
+    </style>
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment"></script>
+    <script src="https://cdn.jsdelivr.net/npm/daterangepicker"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Ship Emission Monitoring</h1>
+        <div class="text-right flex items-center">
+            <button id="run-calculation" class="bg-red-600 text-white px-4 py-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Run Calculation</button>
+            <p class="ml-4">Data Entries: <span id="data-count" class="font-semibold">0</span></p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container mx-auto mt-8 p-4">
+        <div class="flex">
+            <!-- Map Section -->
+            <div class="w-3/5">
+                <div class="relative bg-white rounded-lg shadow p-4 mb-4">
+                    <div class="flex justify-between items-center py-4 px-6">
+                        <div class="control-section">
+                            <h2 class="text-lg font-semibold text-gray-800">Time Period</h2>
+                            <input type="text" id="date-range" class="w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                        </div>
+                        <div class="control-section">
+                            <h2 class="text-lg font-semibold text-gray-800">Ship Type</h2>
+                            <select id="ship-type" class="w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                <option value="all">All</option>
+                                <option value="cargo">Cargo</option>
+                                <option value="tanker">Tanker</option>
+                                <option value="passenger">Passenger</option>
+                            </select>
+                        </div>
+                        <div class="control-section text-right">
+                            <h2 class="text-lg font-semibold text-gray-800">MMSI Count</h2>
+                            <p class="font-semibold" id="mmsi-count">0</p>
+                        </div>
+                    </div>
+                    <div id="map" class="rounded-lg"></div>
+                </div>
+            </div>
+
+            <!-- Emission Summary Section -->
+            <div class="w-2/5 flex flex-col space-y-4">
+                <div class="summary-section bg-white rounded-lg shadow p-4">
+                    <h2 class="text-xl font-bold mb-4">Total Emissions</h2>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-gray-100 p-2 rounded text-center">
+                            <div class="font-bold">CO2 (kg)</div>
+                            <div id="total-co2">0</div>
+                        </div>
+                        <div class="bg-gray-100 p-2 rounded text-center">
+                            <div class="font-bold">NOX (kg)</div>
+                            <div id="total-nox">0</div>
+                        </div>
+                        <div class="bg-gray-100 p-2 rounded text-center">
+                            <div class="font-bold">CO (kg)</div>
+                            <div id="total-co">0</div>
+                        </div>
+                        <div class="bg-gray-100 p-2 rounded text-center">
+                            <div class="font-bold">NMVOC (kg)</div>
+                            <div id="total-nmvoc">0</div>
+                        </div>
+                        <div class="bg-gray-100 p-2 rounded text-center">
+                            <div class="font-bold">PM (kg)</div>
+                            <div id="total-pm">0</div>
+                        </div>
+                        <div class="bg-gray-100 p-2 rounded text-center">
+                            <div class="font-bold">SO2 (kg)</div>
+                            <div id="total-so2">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="summary-section bg-white rounded-lg shadow p-4 mt-4" style="display: flex; flex-direction: column; justify-content: center;">
+                    <h2 class="text-xl font-bold mb-4">Emission Type Percentages</h2>
+                    <div class="flex items-center" style="height: 100%; align-items: center;">
+                        <div class="emission-chart-container">
+                            <canvas id="emission-percentage-chart" class="emission-chart"></canvas>
+                        </div>
+                        <div class="legend" id="emission-legend">
+                            <!-- Legend items will be dynamically generated -->
+                        </div>
+                    </div>
+                </div>         
+                <div class="summary-section bg-white rounded-lg shadow p-4 mt-4">
+                    <h2 class="text-xl font-bold mb-4">Average Emissions</h2>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-gray-100 p-2 rounded text-center">
+                            <div class="font-bold">CO2 (kg)</div>
+                            <div id="avg-co2">0</div>
+                        </div>
+                        <div class="bg-gray-100 p-2 rounded text-center">
+                            <div class="font-bold">NOX (kg)</div>
+                            <div id="avg-nox">0</div>
+                        </div>
+                        <div class="bg-gray-100 p-2 rounded text-center">
+                            <div class="font-bold">CO (kg)</div>
+                            <div id="avg-co">0</div>
+                        </div>
+                        <div class="bg-gray-100 p-2 rounded text-center">
+                            <div class="font-bold">NMVOC (kg)</div>
+                            <div id="avg-nmvoc">0</div>
+                        </div>
+                        <div class="bg-gray-100 p-2 rounded text-center">
+                            <div class="font-bold">PM (kg)</div>
+                            <div id="avg-pm">0</div>
+                        </div>
+                        <div class="bg-gray-100 p-2 rounded text-center">
+                            <div class="font-bold">SO2 (kg)</div>
+                            <div id="avg-so2">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="control-section">
+                    <h2 class="text-lg font-semibold text-gray-800">Select MMSI</h2>
+                    <select id="mmsi-dropdown" class="w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                        <option value="" disabled selected>Select MMSI</option>
+                        <option value="all">All Data</option>
+                        <!-- Options will be dynamically populated -->
+                    </select>
+                    <input type="hidden" id="selected-mmsi-value" class="hidden">
+                    <button id="display-mmsi" class="mt-2 bg-green-600 text-white px-4 py-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">Display</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Emission Table Section -->
+        <div class="mt-8 bg-white rounded-lg shadow p-4">
+            <h2 class="text-xl font-bold mb-4">Emission Data</h2>
+            <div class="table-container">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-4 py-2">MMSI</th>
+                            <th class="px-4 py-2">Start Timestamp</th>
+                            <th class="px-4 py-2">End Timestamp</th>
+                            <th class="px-4 py-2">Vessel Type</th>
+                            <th class="px-4 py-2 text-left">CO2 (kg)</th>
+                            <th class="px-4 py-2 text-left">NOX (kg)</th>
+                            <th class="px-4 py-2 text-left">CO (kg)</th>
+                            <th class="px-4 py-2 text-left">NMVOC (kg)</th>
+                            <th class="px-4 py-2 text-left">PM (kg)</th>
+                            <th class="px-4 py-2 text-left">SO2 (kg)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="emission-table" class="divide-y divide-gray-200">
+                        <!-- Dynamic rows will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+
+        <!-- Line Charts Section -->
+        <div class="mt-8 grid grid-cols-3 gap-4">
+            <div class="chart-container bg-white rounded-lg shadow p-4">
+                <h2 class="text-lg font-bold mb-2">Daily Total CO2 Emissions</h2>
+                <canvas id="co2-chart"></canvas>
+            </div>
+            <div class="chart-container bg-white rounded-lg shadow p-4">
+                <h2 class="text-lg font-bold mb-2">Daily Total NOX Emissions</h2>
+                <canvas id="nox-chart"></canvas>
+            </div>
+            <div class="chart-container bg-white rounded-lg shadow p-4">
+                <h2 class="text-lg font-bold mb-2">Daily Total CO Emissions</h2>
+                <canvas id="co-chart"></canvas>
+            </div>
+            <div class="chart-container bg-white rounded-lg shadow p-4">
+                <h2 class="text-lg font-bold mb-2">Daily Total NMVOC Emissions</h2>
+                <canvas id="nmvoc-chart"></canvas>
+            </div>
+            <div class="chart-container bg-white rounded-lg shadow p-4">
+                <h2 class="text-lg font-bold mb-2">Daily Total PM Emissions</h2>
+                <canvas id="pm-chart"></canvas>
+            </div>
+            <div class="chart-container bg-white rounded-lg shadow p-4">
+                <h2 class="text-lg font-bold mb-2">Daily Total SO2 Emissions</h2>
+                <canvas id="so2-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Candlestick Charts Section -->
+        <div class="mt-8">
+            <!-- First Row: CO2, NOX, CO -->
+            <div class="grid grid-cols-3 gap-4 mb-4">
+                <div class="chart-container bg-white rounded-lg shadow p-4 candlestick-chart-container">
+                    <h2 class="text-lg font-bold mb-2">CO2 Emissions</h2>
+                    <div id="candlestick-co2-chart"></div>
+                </div>
+                <div class="chart-container bg-white rounded-lg shadow p-4 candlestick-chart-container">
+                    <h2 class="text-lg font-bold mb-2">NOX Emissions</h2>
+                    <div id="candlestick-nox-chart"></div>
+                </div>
+                <div class="chart-container bg-white rounded-lg shadow p-4 candlestick-chart-container">
+                    <h2 class="text-lg font-bold mb-2">CO Emissions</h2>
+                    <div id="candlestick-co-chart"></div>
+                </div>
+            </div>
+            <!-- Second Row: NMVOC, PM, SO2 -->
+            <div class="grid grid-cols-3 gap-4">
+                <div class="chart-container bg-white rounded-lg shadow p-4 candlestick-chart-container">
+                    <h2 class="text-lg font-bold mb-2">NMVOC Emissions</h2>
+                    <div id="candlestick-nmvoc-chart"></div>
+                </div>
+                <div class="chart-container bg-white rounded-lg shadow p-4 candlestick-chart-container">
+                    <h2 class="text-lg font-bold mb-2">PM Emissions</h2>
+                    <div id="candlestick-pm-chart"></div>
+                </div>
+                <div class="chart-container bg-white rounded-lg shadow p-4 candlestick-chart-container">
+                    <h2 class="text-lg font-bold mb-2">SO2 Emissions</h2>
+                    <div id="candlestick-so2-chart"></div>
+                </div>
+            </div>
+        </div>
+        <!-- Detailed Emission Data for Selected MMSI Section -->
+        <div class="mt-8 bg-white rounded-lg shadow p-4">
+            <h2 class="text-xl font-bold mb-4">Detailed Emission Data for Selected MMSI</h2>
+            <div class="flex items-center space-x-4 mb-4">
+                <div>
+                    <label for="select-mmsi" class="block text-sm font-medium text-gray-700">Select MMSI</label>
+                    <select id="select-mmsi" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <!-- MMSI options will be inserted here -->
+                    </select>
+                </div>
+                <div>
+                    <button id="filter-mmsi" class="mt-6 bg-blue-600 text-white px-4 py-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Filter</button>
+                </div>
+            </div>
+
+            <div class="flex space-x-4 mb-4">
+                <!-- Ship Data Section -->
+                <div class="w-1/3 bg-gray-100 p-4 rounded-lg shadow">
+                    <h3 class="text-lg font-bold mb-2">Ship Data (AIS)</h3>
+                    <p><strong>MMSI:</strong> <span id="ship-mmsi"></span></p>
+                    <p><strong>Name:</strong> <span id="ship-name"></span></p>
+                    <p><strong>IMO:</strong> <span id="ship-imo"></span></p>
+                    <p><strong>Vessel Type:</strong> <span id="ship-vessel-type"></span></p>
+                    <p><strong>Length:</strong> <span id="ship-length"></span></p>
+                    <p><strong>Width:</strong> <span id="ship-width"></span></p>
+                </div>
+
+                 <!-- MMSI Total Emissions Section -->
+                 <div class="w-1/3 bg-gray-100 p-4 rounded-lg shadow">
+                    <h3 class="text-lg font-bold mb-2">MMSI Total Emissions</h3>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-white p-2 rounded text-center">
+                            <div class="font-bold">CO2 (kg)</div>
+                            <div id="mmsi-total-co2">0</div>
+                        </div>
+                        <div class="bg-white p-2 rounded text-center">
+                            <div class="font-bold">NOX (kg)</div>
+                            <div id="mmsi-total-nox">0</div>
+                        </div>
+                        <div class="bg-white p-2 rounded text-center">
+                            <div class="font-bold">CO (kg)</div>
+                            <div id="mmsi-total-co">0</div>
+                        </div>
+                        <div class="bg-white p-2 rounded text-center">
+                            <div class="font-bold">NMVOC (kg)</div>
+                            <div id="mmsi-total-nmvoc">0</div>
+                        </div>
+                        <div class="bg-white p-2 rounded text-center">
+                            <div class="font-bold">PM (kg)</div>
+                            <div id="mmsi-total-pm">0</div>
+                        </div>
+                        <div class="bg-white p-2 rounded text-center">
+                            <div class="font-bold">SO2 (kg)</div>
+                            <div id="mmsi-total-so2">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                 <!-- MMSI Average Emissions Section -->
+                 <div class="w-1/3 bg-gray-100 p-4 rounded-lg shadow">
+                    <h3 class="text-lg font-bold mb-2">MMSI Average Emissions</h3>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-white p-2 rounded text-center">
+                            <div class="font-bold">CO2 (kg)</div>
+                            <div id="mmsi-avg-co2">0</div>
+                        </div>
+                        <div class="bg-white p-2 rounded text-center">
+                            <div class="font-bold">NOX (kg)</div>
+                            <div id="mmsi-avg-nox">0</div>
+                        </div>
+                        <div class="bg-white p-2 rounded text-center">
+                            <div class="font-bold">CO (kg)</div>
+                            <div id="mmsi-avg-co">0</div>
+                        </div>
+                        <div class="bg-white p-2 rounded text-center">
+                            <div class="font-bold">NMVOC (kg)</div>
+                            <div id="mmsi-avg-nmvoc">0</div>
+                        </div>
+                        <div class="bg-white p-2 rounded text-center">
+                            <div class="font-bold">PM (kg)</div>
+                            <div id="mmsi-avg-pm">0</div>
+                        </div>
+                        <div class="bg-white p-2 rounded text-center">
+                            <div class="font-bold">SO2 (kg)</div>
+                            <div id="mmsi-avg-so2">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MMSI Emission Data Section -->
+            <div class="mt-8 bg-white rounded-lg shadow p-4">
+                <h2 class="text-xl font-bold mb-4">MMSI Emission Data</h2>
+                <div class="table-container">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead>
+                            <tr>
+                                <th class="px-4 py-2">MMSI</th>
+                                <th class="px-4 py-2">Start Timestamp</th>
+                                <th class="px-4 py-2">End Timestamp</th>
+                                <th class="px-4 py-2 text-left">Latitude</th>
+                                <th class="px-4 py-2 text-left">Longitude</th>
+                                <th class="px-4 py-2 text-left">CO2 (kg)</th>
+                                <th class="px-4 py-2 text-left">NOX (kg)</th>
+                                <th class="px-4 py-2 text-left">CO (kg)</th>
+                                <th class="px-4 py-2 text-left">NMVOC (kg)</th>
+                                <th class="px-4 py-2 text-left">PM (kg)</th>
+                                <th class="px-4 py-2 text-left">SO2 (kg)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mmsi-emission-table" class="divide-y divide-gray-200">
+                            <!-- Dynamic rows will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Add new chart containers below the MMSI Emission Data section -->
+            <div class="mt-8 grid grid-cols-3 gap-4">
+                <div class="chart-container bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-bold mb-2">MMSI CO2 Emissions</h2>
+                    <canvas id="mmsi-co2-chart"></canvas>
+                </div>
+                <div class="chart-container bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-bold mb-2">MMSI NOX Emissions</h2>
+                    <canvas id="mmsi-nox-chart"></canvas>
+                </div>
+                <div class="chart-container bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-bold mb-2">MMSI CO Emissions</h2>
+                    <canvas id="mmsi-co-chart"></canvas>
+                </div>
+                <div class="chart-container bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-bold mb-2">MMSI NMVOC Emissions</h2>
+                    <canvas id="mmsi-nmvoc-chart"></canvas>
+                </div>
+                <div class="chart-container bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-bold mb-2">MMSI PM Emissions</h2>
+                    <canvas id="mmsi-pm-chart"></canvas>
+                </div>
+                <div class="chart-container bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-bold mb-2">MMSI SO2 Emissions</h2>
+                    <canvas id="mmsi-so2-chart"></canvas>
+                </div>
+            </div>
+
+    <!-- Chart.js Script -->
+    <script>
+        // Initialize the exampleDates variable to hold dates from the response
+        let exampleDates = [];
+        let map;
+        let markers = [];
+        let polylines = [];
+
+        function fetchAndDisplayResults() {
+            $.ajax({
+                url: '{% url "run_calculation" %}',
+                data: {
+                    'start_date': $('#date-range').val().split(' - ')[0],
+                    'end_date': $('#date-range').val().split(' - ')[1]
+                },
+                success: function(data) {
+                    console.log('Response Data:', data); // Log the response data
+
+                    $('#total-co2').text(data.total_co2.toFixed(3));
+                    $('#total-nox').text(data.total_nox.toFixed(3));
+                    $('#total-co').text(data.total_co.toFixed(3));
+                    $('#total-nmvoc').text(data.total_nmvoc.toFixed(3));
+                    $('#total-pm').text(data.total_pm.toFixed(3));
+                    $('#total-so2').text(data.total_so2.toFixed(3));
+
+                    $('#avg-co2').text(data.co2_avg.toFixed(3));
+                    $('#avg-nox').text(data.nox_avg.toFixed(3));
+                    $('#avg-co').text(data.co_avg.toFixed(3));
+                    $('#avg-nmvoc').text(data.nmvoc_avg.toFixed(3));
+                    $('#avg-pm').text(data.pm_avg.toFixed(3));
+                    $('#avg-so2').text(data.so2_avg.toFixed(3));
+
+                    $('#ship-mmsi').text(data.ship_mmsi);
+                    $('#ship-name').text(data.ship_name);
+                    $('#ship-imo').text(data.ship_imo);
+                    $('#ship-vessel-type').text(data.ship_vessel_type);
+                    $('#ship-length').text(data.ship_length);
+                    $('#ship-width').text(data.ship_width);
+
+                    $('#emission-table').html(data.emission_table_html);
+                    $('#selected-mmsi-emission-table').html(data.selected_mmsi_table_html);
+                    $('#select-mmsi').html(data.mmsi_options_html);
+                    $('#data-count').text(data.ais_data_count); // Update the data count on the page
+
+                    // Update MMSI count
+                    console.log('Unique MMSI Count:', data.unique_mmsi_count); // Log the unique MMSI count
+                    $('#mmsi-count').text(data.unique_mmsi_count); // Update the MMSI count on the page
+
+                    // Call functions to update charts
+                    updateCharts(data);
+                    updateDoughnutChart(data.emission_percentages); // Update the doughnut chart with percentages
+
+                    console.log('Candlestick Data:', data.candlestick_data); // Log the candlestick data
+                    updateCandlestickCharts(data.candlestick_data); // Update candlestick charts with data
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', status, error);
+                }
+            });
+        }
+
+        function createCandlestickChart(elementId, label, data, pollutantType) {
+            const trace = {
+                x: data.map(entry => entry.date),
+                close: data.map(entry => entry[`close_${pollutantType}`]),
+                decreasing: { line: { color: 'red' } },
+                high: data.map(entry => entry[`high_${pollutantType}`]),
+                increasing: { line: { color: 'green' } },
+                low: data.map(entry => entry[`low_${pollutantType}`]),
+                open: data.map(entry => entry[`open_${pollutantType}`]),
+                type: 'candlestick',
+                xaxis: 'x',
+                yaxis: 'y'
+            };
+
+            const layout = {
+                title: `${label} Emissions`,
+                xaxis: {
+                    title: 'Date',
+                    type: 'date'
+                },
+                yaxis: {
+                    title: 'Amount'
+                }
+            };
+
+            Plotly.newPlot(elementId, [trace], layout);
+        }
+
+
+        function updateCandlestickCharts(data) {
+            createCandlestickChart('candlestick-co2-chart', 'CO2', data, 'CO2');
+            createCandlestickChart('candlestick-nox-chart', 'NOX', data, 'NOX');
+            createCandlestickChart('candlestick-co-chart', 'CO', data, 'CO');
+            createCandlestickChart('candlestick-nmvoc-chart', 'NMVOC', data, 'NMVOC');
+            createCandlestickChart('candlestick-pm-chart', 'PM', data, 'PM');
+            createCandlestickChart('candlestick-so2-chart', 'SO2', data, 'SO2');
+        }
+
+
+        function createDoughnutChart(ctx, data) {
+            const chart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['CO2', 'NOX', 'CO', 'NMVOC', 'PM', 'SO2'],
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            '#6CE5E8', // CO2
+                            '#2F5F98', // NOX
+                            '#41B8D5', // CO
+                            '#31356E', // NMVOC
+                            '#2D8BBA', // PM
+                            '#5E3967'  // SO2
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false // Disable default legend
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    return tooltipItem.label + ' : ' + tooltipItem.raw.toFixed(2) + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Generate custom legend
+            const legendContainer = document.getElementById('emission-legend');
+            legendContainer.innerHTML = '';
+            chart.data.labels.forEach((label, index) => {
+                const legendItem = document.createElement('div');
+                legendItem.className = 'legend-item';
+                legendItem.innerHTML = `
+                    <div class="legend-color" style="background-color: ${chart.data.datasets[0].backgroundColor[index]};"></div>
+                    <div>${label} : ${chart.data.datasets[0].data[index].toFixed(2)}%</div>
+                `;
+                legendContainer.appendChild(legendItem);
+            });
+
+            return chart;
+        }
+
+        function updateDoughnutChart(percentages) {
+            const ctx = document.getElementById('emission-percentage-chart').getContext('2d');
+            const data = [
+                percentages.CO2 || 0,
+                percentages.NOX || 0,
+                percentages.CO || 0,
+                percentages.NMVOC || 0,
+                percentages.PM || 0,
+                percentages.SO2 || 0
+            ];
+            createDoughnutChart(ctx, data);
+        }
+
+        function fetchAndDisplayShipData(mmsi) {
+            clearMmsiData();  // Clear existing data before writing new data
+            clearAllCharts(); // Clear the chart data before updating
+            $.ajax({
+                url: '{% url "filter_mmsi" %}',
+                data: {
+                    'mmsi': mmsi
+                },
+                success: function(data) {
+                    console.log('Ship Data:', data.ship_data);  // Debugging line
+                    console.log('MMSI Emission Table HTML:', data.mmsi_emission_table_html);  // Debugging line
+                    console.log('MMSI Total Emissions:', data.mmsi_total_emissions);  // Debugging line
+                    console.log('MMSI Average Emissions:', data.mmsi_average_emissions);  // Debugging line
+                    console.log('MMSI Daily Emissions:', data.mmsi_daily_emissions);  // Debugging line
+
+                    // Update Ship Data (AIS) section
+                    $('#ship-mmsi').text(data.ship_data.mmsi || 'N/A');
+                    $('#ship-name').text(data.ship_data.name || 'N/A');
+                    $('#ship-imo').text(data.ship_data.imo || 'N/A');
+                    $('#ship-vessel-type').text(data.ship_data.vessel_type || 'N/A');
+                    $('#ship-length').text(data.ship_data.length || 'N/A');
+                    $('#ship-width').text(data.ship_data.width || 'N/A');
+
+                    // Update MMSI Emission Data table
+                    $('#mmsi-emission-table').html(data.mmsi_emission_table_html);
+
+                    // Update MMSI Total Emissions section
+                    const mmsiTotalEmissions = data.mmsi_total_emissions.reduce((acc, emission) => {
+                        acc[emission.emission_type] = emission.mmsi_total;
+                        return acc;
+                    }, {});
+
+                    $('#mmsi-total-co2').text(mmsiTotalEmissions['CO2'] || '0');
+                    $('#mmsi-total-nox').text(mmsiTotalEmissions['NOX'] || '0');
+                    $('#mmsi-total-co').text(mmsiTotalEmissions['CO'] || '0');
+                    $('#mmsi-total-nmvoc').text(mmsiTotalEmissions['NMVOC'] || '0');
+                    $('#mmsi-total-pm').text(mmsiTotalEmissions['PM'] || '0');
+                    $('#mmsi-total-so2').text(mmsiTotalEmissions['SO2'] || '0');
+
+                    // Update MMSI daily emission charts
+                    updateMmsiDailyEmissionCharts(data.mmsi_daily_emissions);
+
+                    // Update MMSI Average Emissions section
+                    const mmsiAvgEmissions = data.mmsi_average_emissions;
+                    $('#mmsi-avg-co2').text(mmsiAvgEmissions['avg_co2'] ? mmsiAvgEmissions['avg_co2'].toFixed(3) : '0');
+                    $('#mmsi-avg-nox').text(mmsiAvgEmissions['avg_nox'] ? mmsiAvgEmissions['avg_nox'].toFixed(3) : '0');
+                    $('#mmsi-avg-co').text(mmsiAvgEmissions['avg_co'] ? mmsiAvgEmissions['avg_co'].toFixed(3) : '0');
+                    $('#mmsi-avg-nmvoc').text(mmsiAvgEmissions['avg_nmvoc'] ? mmsiAvgEmissions['avg_nmvoc'].toFixed(3) : '0');
+                    $('#mmsi-avg-pm').text(mmsiAvgEmissions['avg_pm'] ? mmsiAvgEmissions['avg_pm'].toFixed(3) : '0');
+                    $('#mmsi-avg-so2').text(mmsiAvgEmissions['avg_so2'] ? mmsiAvgEmissions['avg_so2'].toFixed(3) : '0');
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', status, error);
+                }
+            });
+        }
+
+        function updateCharts(data) {
+            const exampleDates = data.exampleDates;
+
+            createChart(document.getElementById('co2-chart').getContext('2d'), 'CO2', exampleDates, data.co2_data, data.co2_avg);
+            createChart(document.getElementById('nox-chart').getContext('2d'), 'NOX', exampleDates, data.nox_data, data.nox_avg);
+            createChart(document.getElementById('co-chart').getContext('2d'), 'CO', exampleDates, data.co_data, data.co_avg);
+            createChart(document.getElementById('nmvoc-chart').getContext('2d'), 'NMVOC', exampleDates, data.nmvoc_data, data.nmvoc_avg);
+            createChart(document.getElementById('pm-chart').getContext('2d'), 'PM', exampleDates, data.pm_data, data.pm_avg);
+            createChart(document.getElementById('so2-chart').getContext('2d'), 'SO2', exampleDates, data.so2_data, data.so2_avg);
+        }
+
+        function updateMmsiDailyEmissionCharts(data) {
+            const dates = data.map(entry => entry.date);
+            const co2Data = data.map(entry => entry.mmsitotal_CO2);
+            const noxData = data.map(entry => entry.mmsitotal_NOX);
+            const coData = data.map(entry => entry.mmsitotal_CO);
+            const nmvocData = data.map(entry => entry.mmsitotal_NMVOC);
+            const pmData = data.map(entry => entry.mmsitotal_PM);
+            const so2Data = data.map(entry => entry.mmsitotal_SO2);
+
+            const avgCo2 = co2Data.reduce((a, b) => a + b, 0) / co2Data.length;
+            const avgNox = noxData.reduce((a, b) => a + b, 0) / noxData.length;
+            const avgCo = coData.reduce((a, b) => a + b, 0) / coData.length;
+            const avgNmvoc = nmvocData.reduce((a, b) => a + b, 0) / nmvocData.length;
+            const avgPm = pmData.reduce((a, b) => a + b, 0) / pmData.length;
+            const avgSo2 = so2Data.reduce((a, b) => a + b, 0) / so2Data.length;
+
+            if (mmsiCo2Chart) mmsiCo2Chart.destroy();
+            if (mmsiNoxChart) mmsiNoxChart.destroy();
+            if (mmsiCoChart) mmsiCoChart.destroy();
+            if (mmsiNmvocChart) mmsiNmvocChart.destroy();
+            if (mmsiPmChart) mmsiPmChart.destroy();
+            if (mmsiSo2Chart) mmsiSo2Chart.destroy();
+
+            mmsiCo2Chart = createMmsiChart(document.getElementById('mmsi-co2-chart').getContext('2d'), 'MMSI CO2', dates, co2Data, avgCo2);
+            mmsiNoxChart = createMmsiChart(document.getElementById('mmsi-nox-chart').getContext('2d'), 'MMSI NOX', dates, noxData, avgNox);
+            mmsiCoChart = createMmsiChart(document.getElementById('mmsi-co-chart').getContext('2d'), 'MMSI CO', dates, coData, avgCo);
+            mmsiNmvocChart = createMmsiChart(document.getElementById('mmsi-nmvoc-chart').getContext('2d'), 'MMSI NMVOC', dates, nmvocData, avgNmvoc);
+            mmsiPmChart = createMmsiChart(document.getElementById('mmsi-pm-chart').getContext('2d'), 'MMSI PM', dates, pmData, avgPm);
+            mmsiSo2Chart = createMmsiChart(document.getElementById('mmsi-so2-chart').getContext('2d'), 'MMSI SO2', dates, so2Data, avgSo2);
+        }
+
+        function createChart(ctx, label, labels, data, avg) {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: `${label} Total`,
+                            data: data,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1,
+                            fill: false
+                        },
+                        {
+                            label: `${label} Average`,
+                            data: Array(labels.length).fill(avg),
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 1,
+                            fill: false,
+                            borderDash: [10, 5]
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Amount'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createMmsiChart(ctx, label, labels, data, avg) {
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: `${label} Emissions`,
+                            data: data,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1,
+                            fill: false
+                        },
+                        {
+                            label: `${label} Average`,
+                            data: Array(labels.length).fill(avg),
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 1,
+                            fill: false,
+                            borderDash: [10, 5]
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Amount'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function clearMmsiData() {
+            $('#ship-mmsi').text('');
+            $('#ship-name').text('');
+            $('#ship-imo').text('');
+            $('#ship-vessel-type').text('');
+            $('#ship-length').text('');
+            $('#ship-width').text('');
+
+            $('#mmsi-total-co2').text('0');
+            $('#mmsi-total-nox').text('0');
+            $('#mmsi-total-co').text('0');
+            $('#mmsi-total-nmvoc').text('0');
+            $('#mmsi-total-pm').text('0');
+            $('#mmsi-total-so2').text('0');
+
+            $('#mmsi-avg-co2').text('0');
+            $('#mmsi-avg-nox').text('0');
+            $('#mmsi-avg-co').text('0');
+            $('#mmsi-avg-nmvoc').text('0');
+            $('#mmsi-avg-pm').text('0');
+            $('#mmsi-avg-so2').text('0');
+
+            $('#mmsi-emission-table').html('');
+        }
+
+        let mmsiCo2Chart;
+        let mmsiNoxChart;
+        let mmsiCoChart;
+        let mmsiNmvocChart;
+        let mmsiPmChart;
+        let mmsiSo2Chart;
+
+        function clearChartData(chart) {
+            if (chart) {
+                chart.data.labels = [];
+                chart.data.datasets.forEach(dataset => {
+                    dataset.data = [];
+                });
+                chart.update();
+            }
+        }
+
+        function clearAllCharts() {
+            clearChartData(mmsiCo2Chart);
+            clearChartData(mmsiNoxChart);
+            clearChartData(mmsiCoChart);
+            clearChartData(mmsiNmvocChart);
+            clearChartData(mmsiPmChart);
+            clearChartData(mmsiSo2Chart);
+        }
+
+        $(document).ready(function() {
+            $('#filter-mmsi').on('click', function() {
+                const selectedMmsi = $('#select-mmsi').val();
+                fetchAndDisplayShipData(selectedMmsi);
+            });
+        });
+
+        $(function() {
+            $('#date-range').daterangepicker({
+                opens: 'left',
+                showDropdowns: true,
+                locale: {
+                    format: 'MM/DD/YYYY',
+                    separator: ' - ',
+                    applyLabel: 'Apply',
+                    cancelLabel: 'Cancel',
+                    fromLabel: 'From',
+                    toLabel: 'To',
+                    customRangeLabel: 'Custom',
+                    weekLabel: 'W',
+                    daysOfWeek: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
+                    monthNames: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+                    firstDay: 1
+                }
+            });
+
+            $('#run-calculation').on('click', function() {
+                fetchAndDisplayResults();
+            });
+        });
+
+        function initMap() {
+            const mapOptions = {
+                center: { lat: -6.0302, lng: 106.87216 }, // Default coordinates
+                zoom: 12
+            };
+            map = new google.maps.Map(document.getElementById('map'), mapOptions);
+
+            // Fetch MMSI options to populate the dropdown
+            fetchMmsiOptions();
+        }
+
+        function addMarkers(data) {
+            clearMarkersAndPolylines(); // Clear existing markers and polylines
+
+            // Group data by MMSI
+            const groupedData = data.reduce((acc, point) => {
+                if (!acc[point.mmsi]) {
+                    acc[point.mmsi] = [];
+                }
+                acc[point.mmsi].push(point);
+                return acc;
+            }, {});
+
+            for (const mmsi in groupedData) {
+                if (groupedData.hasOwnProperty(mmsi)) {
+                    const points = groupedData[mmsi];
+
+                    // Sort points by timestamp
+                    points.sort((a, b) => new Date(a.start_timestamp) - new Date(b.start_timestamp));
+
+                    let previousPoint = null;
+                    points.forEach(point => {
+                        const emissionColor = getEmissionColor(point.CO2);
+                        const circle = new google.maps.Circle({
+                            strokeColor: emissionColor,
+                            strokeOpacity: 0.8,
+                            strokeWeight: 2,
+                            fillColor: emissionColor,
+                            fillOpacity: 0.35,
+                            map: map,
+                            center: { lat: point.start_latitude, lng: point.start_longitude },
+                            radius: 200 // Adjust the radius as needed, this is in meters
+                        });
+
+                        const infowindow = new google.maps.InfoWindow({
+                            content: `
+                                <div>
+                                    <p><strong>MMSI:</strong> ${point.mmsi}</p>
+                                    <p><strong>Vessel Type:</strong> ${point.vessel_type}</p>
+                                    <p><strong>Latitude:</strong> ${point.start_latitude}</p>
+                                    <p><strong>Longitude:</strong> ${point.start_longitude}</p>
+                                    <p><strong>CO2:</strong> ${point.CO2}</p>
+                                    <p><strong>NOX:</strong> ${point.NOX}</p>
+                                    <p><strong>CO:</strong> ${point.CO}</p>
+                                    <p><strong>NMVOC:</strong> ${point.NMVOC}</p>
+                                    <p><strong>PM:</strong> ${point.PM}</p>
+                                    <p><strong>SO2:</strong> ${point.SO2}</p>
+                                </div>
+                            `
+                        });
+
+                        circle.addListener('click', () => {
+                            infowindow.setPosition(circle.getCenter());
+                            infowindow.open(map, circle);
+                        });
+
+                        markers.push(circle); // Add circle to markers array
+
+                        // Draw polyline if there's a previous point
+                        if (previousPoint) {
+                            const line = new google.maps.Polyline({
+                                path: [
+                                    { lat: previousPoint.start_latitude, lng: previousPoint.start_longitude },
+                                    { lat: point.start_latitude, lng: point.start_longitude }
+                                ],
+                                geodesic: true,
+                                strokeColor: emissionColor,
+                                strokeOpacity: 1.0,
+                                strokeWeight: 2,
+                                map: map
+                            });
+                            polylines.push(line); // Add line to polylines array
+                        }
+
+                        previousPoint = point; // Update previous point
+                    });
+                }
+            }
+        }
+
+        function clearMarkersAndPolylines() {
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+            polylines.forEach(polyline => polyline.setMap(null));
+            polylines = [];
+        }
+
+        function getEmissionColor(co2) {
+            if (co2 >= 0 && co2 <= 200) {
+                return '#00FF00'; // Hijau
+            } else if (co2 > 200 && co2 <= 400) {
+                return '#32CD32'; // Hijau Limau
+            } else if (co2 > 400 && co2 <= 600) {
+                return '#7FFF00'; // Chartreuse
+            } else if (co2 > 600 && co2 <= 800) {
+                return '#ADFF2F'; // Hijau Kuning
+            } else if (co2 > 800 && co2 <= 1000) {
+                return '#FFFF00'; // Kuning
+            } else if (co2 > 1000 && co2 <= 1200) {
+                return '#FFD700'; // Emas
+            } else if (co2 > 1200 && co2 <= 1400) {
+                return '#FFA500'; // Jingga
+            } else if (co2 > 1400 && co2 <= 1600) {
+                return '#FF8C00'; // Jingga Gelap
+            } else if (co2 > 1600 && co2 <= 1800) {
+                return '#FF4500'; // Jingga Merah
+            } else if (co2 > 1800 && co2 <= 2000) {
+                return '#FF0000'; // Merah
+            } else {
+                return '#8B0000'; // Dark Red (Merah Gelap)
+            }
+        }
+
+        function fetchPointsData(mmsi) {
+            $.ajax({
+                url: '{% url "fetch_points_data" %}',
+                data: { 'mmsi': mmsi },
+                success: function(data) {
+                    addMarkers(data.points);
+                    updateMmsiDropdown(data.mmsi_options, mmsi); // Pass the selected MMSI to the dropdown update function
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', status, error);
+                }
+            });
+        }
+
+        function fetchMmsiOptions() {
+            $.ajax({
+                url: '{% url "fetch_points_data" %}',
+                data: { 'mmsi': 'all' }, // Fetch MMSI options without displaying markers
+                success: function(data) {
+                    updateMmsiDropdown(data.mmsi_options, ''); // Populate dropdown with MMSI options
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', status, error);
+                }
+            });
+        }
+
+        function updateMmsiDropdown(options, selectedMmsi) {
+            const dropdown = document.getElementById('mmsi-dropdown');
+            dropdown.innerHTML = ''; // Clear existing options
+
+            // Add "Select MMSI" option
+            const selectOption = document.createElement('option');
+            selectOption.value = '';
+            selectOption.disabled = true;
+            selectOption.textContent = 'Select MMSI';
+            dropdown.appendChild(selectOption);
+
+            // Add "All Data" option
+            const allOption = document.createElement('option');
+            allOption.value = 'all';
+            allOption.textContent = 'All Data';
+            dropdown.appendChild(allOption);
+
+            // Add MMSI options
+            options.forEach(option => {
+                const opt = document.createElement('option');
+                opt.value = option.mmsi;
+                opt.textContent = option.mmsi;
+                dropdown.appendChild(opt);
+            });
+
+            // Set the selected value
+            dropdown.value = selectedMmsi;
+        }
+
+        $(document).ready(function() {
+            // Event listener for the "Display" button
+            $('#display-mmsi').on('click', function() {
+                const selectedMmsi = $('#mmsi-dropdown').val();
+                $('#selected-mmsi-value').val(selectedMmsi); // Set the hidden input value
+                fetchPointsData(selectedMmsi); // Fetch data based on selected MMSI
+            });
+
+            // Event listener for the MMSI dropdown change event
+            $('#mmsi-dropdown').on('change', function() {
+                const selectedMmsi = $(this).val();
+                $('#selected-mmsi-value').val(selectedMmsi);
+            });
+        });
+
+
+        // Initialize the map
+        google.maps.event.addDomListener(window, 'load', initMap);
+    </script>
+
+    <!-- Google Maps Script -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDYVkD9WZCA_QrTWomoOWt2BK6D55e-tNM&callback=initMap" async defer></script>
+</body>
+</html>
