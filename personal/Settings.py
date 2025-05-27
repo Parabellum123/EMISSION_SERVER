@@ -19,7 +19,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ✅ Keamanan & konfigurasi dasar
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-default-key')
 DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true'
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '156.67.216.241,localhost').split(',')
 
 # ✅ Aplikasi yang digunakan
 INSTALLED_APPS = [
@@ -66,7 +66,7 @@ WSGI_APPLICATION = 'emissionsite.wsgi.application'
 POSTGRES_DB = os.getenv('POSTGRES_DB')
 POSTGRES_USER = os.getenv('POSTGRES_USER')
 POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD')
-POSTGRES_HOST = os.getenv('POSTGRES_HOST', '127.0.0.1')
+POSTGRES_HOST = os.getenv('POSTGRES_HOST', '156.67.216.241')
 POSTGRES_PORT = int(os.getenv('POSTGRES_PORT', 5432))
 
 if not all([POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_PORT]):

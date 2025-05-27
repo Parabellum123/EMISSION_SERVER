@@ -83,11 +83,17 @@ def calculate_emissions(start_date, end_date):
 
         # 9️⃣ Simpan ke PostgreSQL
         result = df.select(
-            "mmsi", "vessel_type_ap", "start_time", "end_time",
-            "lat_start", "lon_start", "lat_end", "lon_end",
+            "mmsi", col("vessel_type_ap").alias("vessel_type"),
+            col("start_time").alias("start_timestamp"),
+            col("end_time").alias("end_timestamp"),
+            col("lat_start").alias("start_latitude"),
+            col("lon_start").alias("start_longitude"),
+            col("lat_end").alias("end_latitude"),
+            col("lon_end").alias("end_longitude"),
             "speed_avg", "design_speed", "duration_hr", "load_ratio",
             "mcr", "auxiliary_engine_power", *emissions
         )
+
 
         result.write.jdbc(url=JDBC_URL, table="emission_output_final", mode="overwrite", properties=CONNECTION_PROPERTIES)
         print("✅ Emisi berhasil disimpan ke tabel 'emission_output_final'")

@@ -7,6 +7,8 @@ from emissionproject.scripts.calculateselect import run_filter
 import subprocess
 import os
 import psycopg2
+import psycopg2.extras
+
 
 
 def home(request):
@@ -138,7 +140,7 @@ def fetch_points_data(request):
         port="5432"
     )
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     if mmsi and mmsi != 'all':
         query = """
@@ -217,7 +219,7 @@ def fetch_ship_data(mmsi):
         port="5432"
     )
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     try:
         # Coba ambil data kapal dengan kondisi panjang > lebar (optional logic)
@@ -263,7 +265,7 @@ def fetch_mmsi_emission_data():
         port="5432"
     )
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     query = """
     SELECT mmsi, 
@@ -290,7 +292,7 @@ def fetch_mmsi_total_emissions():
         port="5432"
     )
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     query = """
     SELECT emission_type, mmsi_total
@@ -314,7 +316,7 @@ def fetch_unique_mmsi_options():
 )
 
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     query = """
     SELECT DISTINCT mmsi
@@ -363,7 +365,7 @@ def fetch_results_from_db(start_date_str, end_date_str):
         port="5432"
     )
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     query = """
     SELECT mmsi, vessel_type, start_timestamp, start_latitude, start_longitude,
@@ -388,7 +390,7 @@ def fetch_emission_output_data():
         port="5432"
     )
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     query = """
     SELECT mmsi, vessel_type, 
@@ -415,7 +417,7 @@ def fetch_total_daily_data():
         port="5432"
     )
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     query = """
     SELECT date, total_CO2, open_CO2, close_CO2, high_CO2, low_CO2,
@@ -444,7 +446,7 @@ def fetch_total_emissions():
         port="5432"
     )
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     query = """
     SELECT emission_type, total
@@ -470,7 +472,7 @@ def fetch_mmsi_daily_emissions(mmsi):
         port="5432"
     )
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     query = """
     SELECT date, mmsitotal_CO2, mmsitotal_NOX, mmsitotal_CO, mmsitotal_NMVOC, mmsitotal_PM, mmsitotal_SO2
@@ -495,7 +497,7 @@ def calculate_mmsi_average_emissions(mmsi):
         port="5432"
     )
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     query = """
     SELECT 
@@ -525,7 +527,7 @@ def fetch_candlestick_data():
         port="5432"
     )
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     query = """
     SELECT date, 

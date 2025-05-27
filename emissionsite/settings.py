@@ -14,8 +14,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Keamanan dasar
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-default-key')
-DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true'
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '156.67.216.241']
 
 # Aplikasi Django
 INSTALLED_APPS = [

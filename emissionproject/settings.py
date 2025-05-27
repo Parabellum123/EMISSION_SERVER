@@ -76,7 +76,7 @@ WSGI_APPLICATION = 'emissionproject.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': 'emissionprojectdb',
         'USER': 'postgres',
         'PASSWORD': 'Achmadriadi@123',
