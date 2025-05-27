@@ -145,7 +145,7 @@ def fetch_points_data(request):
     if mmsi and mmsi != 'all':
         query = """
         SELECT mmsi, vessel_type, start_timestamp, start_latitude, start_longitude,
-               CO2, NOX, CO, NMVOC, PM, SO2
+            "CO2", "NOX", "CO", "NMVOC", "PM", "SO2"
         FROM emission_output_final
         WHERE mmsi = %s
         ORDER BY start_timestamp ASC
@@ -154,10 +154,11 @@ def fetch_points_data(request):
     else:
         query = """
         SELECT mmsi, vessel_type, start_timestamp, start_latitude, start_longitude,
-               CO2, NOX, CO, NMVOC, PM, SO2
+            "CO2", "NOX", "CO", "NMVOC", "PM", "SO2"
         FROM emission_output_final
         ORDER BY start_timestamp ASC
         """
+
         cursor.execute(query)
 
     points = cursor.fetchall()
@@ -269,12 +270,14 @@ def fetch_mmsi_emission_data():
 
     query = """
     SELECT mmsi, 
-           TO_CHAR(start_timestamp, 'YYYY-MM-DD HH24:MI:SS') as start_timestamp, 
-           TO_CHAR(end_timestamp, 'YYYY-MM-DD HH24:MI:SS') as end_timestamp, 
-           start_latitude, start_longitude, CO2, NOX, CO, NMVOC, PM, SO2
+        TO_CHAR(start_timestamp, 'YYYY-MM-DD HH24:MI:SS') as start_timestamp, 
+        TO_CHAR(end_timestamp, 'YYYY-MM-DD HH24:MI:SS') as end_timestamp, 
+        start_latitude, start_longitude, 
+        "CO2", "NOX", "CO", "NMVOC", "PM", "SO2"
     FROM select_emission
     ORDER BY start_timestamp ASC
     """
+
     cursor.execute(query)
     results = cursor.fetchall()
 
@@ -369,7 +372,7 @@ def fetch_results_from_db(start_date_str, end_date_str):
 
     query = """
     SELECT mmsi, vessel_type, start_timestamp, start_latitude, start_longitude,
-           end_timestamp, CO2, NOX, CO, NMVOC, PM, SO2
+        end_timestamp, "CO2", "NOX", "CO", "NMVOC", "PM", "SO2"
     FROM emission_output_final
     WHERE start_timestamp BETWEEN %s AND %s
     """
@@ -396,7 +399,7 @@ def fetch_emission_output_data():
     SELECT mmsi, vessel_type, 
            TO_CHAR(start_timestamp, 'YYYY-MM-DD HH24:MI:SS') as start_timestamp, 
            TO_CHAR(end_timestamp, 'YYYY-MM-DD HH24:MI:SS') as end_timestamp, 
-           CO2, NOX, CO, NMVOC, PM, SO2
+           "CO2", "NOX", "CO", "NMVOC", "PM", "SO2"
     FROM emission_output_final
     ORDER BY start_timestamp ASC
     """
@@ -420,12 +423,13 @@ def fetch_total_daily_data():
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     query = """
-    SELECT date, total_CO2, open_CO2, close_CO2, high_CO2, low_CO2,
-           total_NOX, open_NOX, close_NOX, high_NOX, low_NOX,
-           total_CO, open_CO, close_CO, high_CO, low_CO,
-           total_NMVOC, open_NMVOC, close_NMVOC, high_NMVOC, low_NMVOC,
-           total_PM, open_PM, close_PM, high_PM, low_PM,
-           total_SO2, open_SO2, close_SO2, high_SO2, low_SO2
+    SELECT date, 
+        "total_CO2", "open_CO2", "close_CO2", "high_CO2", "low_CO2",
+        "total_NOX", "open_NOX", "close_NOX", "high_NOX", "low_NOX",
+        "total_CO", "open_CO", "close_CO", "high_CO", "low_CO",
+        "total_NMVOC", "open_NMVOC", "close_NMVOC", "high_NMVOC", "low_NMVOC",
+        "total_PM", "open_PM", "close_PM", "high_PM", "low_PM",
+        "total_SO2", "open_SO2", "close_SO2", "high_SO2", "low_SO2"
     FROM total_daily
     ORDER BY date ASC
     """
@@ -501,15 +505,16 @@ def calculate_mmsi_average_emissions(mmsi):
 
     query = """
     SELECT 
-        AVG(CO2) as avg_co2, 
-        AVG(NOX) as avg_nox, 
-        AVG(CO) as avg_co, 
-        AVG(NMVOC) as avg_nmvoc, 
-        AVG(PM) as avg_pm, 
-        AVG(SO2) as avg_so2
-    FROM select_emission
+        AVG("CO2") as avg_co2, 
+        AVG("NOX") as avg_nox, 
+        AVG("CO") as avg_co, 
+        AVG("NMVOC") as avg_nmvoc, 
+        AVG("PM") as avg_pm, 
+        AVG("SO2") as avg_so2
+        FROM select_emission
     WHERE mmsi = %s
     """
+
     cursor.execute(query, (mmsi,))
     result = cursor.fetchone()
 
@@ -531,15 +536,16 @@ def fetch_candlestick_data():
 
     query = """
     SELECT date, 
-           total_CO2, open_CO2, close_CO2, high_CO2, low_CO2, 
-           total_NOX, open_NOX, close_NOX, high_NOX, low_NOX, 
-           total_CO, open_CO, close_CO, high_CO, low_CO, 
-           total_NMVOC, open_NMVOC, close_NMVOC, high_NMVOC, low_NMVOC, 
-           total_PM, open_PM, close_PM, high_PM, low_PM, 
-           total_SO2, open_SO2, close_SO2, high_SO2, low_SO2
+        "total_CO2", "open_CO2", "close_CO2", "high_CO2", "low_CO2", 
+        "total_NOX", "open_NOX", "close_NOX", "high_NOX", "low_NOX", 
+        "total_CO", "open_CO", "close_CO", "high_CO", "low_CO", 
+        "total_NMVOC", "open_NMVOC", "close_NMVOC", "high_NMVOC", "low_NMVOC", 
+        "total_PM", "open_PM", "close_PM", "high_PM", "low_PM", 
+        "total_SO2", "open_SO2", "close_SO2", "high_SO2", "low_SO2"
     FROM total_daily
     ORDER BY date ASC
     """
+
     cursor.execute(query)
     results = cursor.fetchall()
 

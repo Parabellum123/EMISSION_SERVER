@@ -1,29 +1,39 @@
+# db_totaldaily.py
+# scripts/db_totaldaily.py
+
+import os
+from dotenv import load_dotenv
 import pandas as pd
 from sqlalchemy import create_engine
+from urllib.parse import quote
+
+
+load_dotenv('/root/emissionfolder/.env')
 
 def main():
-    user = "postgres"
-    password = "Achmadriadi@123"
-    host = "156.67.216.241"
-    database = "emissionprojectdb"
-    port = "5432"
+    user = os.getenv("POSTGRES_USER")
+    raw_password = "Achmadriadi@123"
+    password = quote(raw_password)
+    host = os.getenv("POSTGRES_HOST")
+    database = os.getenv("POSTGRES_DB")
+    port = os.getenv("POSTGRES_PORT")
 
     engine = create_engine(f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}")
 
     # ✅ Pakai lowercase sesuai Spark output
-    query = 'SELECT end_timestamp, co2, nox, co, nmvoc, pm, so2 FROM emission_output_final'
+    query = 'SELECT end_timestamp, "CO2", "NOX", "CO", "NMVOC", "PM", "SO2" FROM emission_output_final'
     df = pd.read_sql(query, engine)
 
     df['end_timestamp'] = pd.to_datetime(df['end_timestamp'])
     df['date'] = df['end_timestamp'].dt.date
 
     daily_emissions = df.groupby('date').agg({
-        'co2': ['sum', 'first', 'last', 'max', 'min'],
-        'nox': ['sum', 'first', 'last', 'max', 'min'],
-        'co': ['sum', 'first', 'last', 'max', 'min'],
-        'nmvoc': ['sum', 'first', 'last', 'max', 'min'],
-        'pm': ['sum', 'first', 'last', 'max', 'min'],
-        'so2': ['sum', 'first', 'last', 'max', 'min']
+        'CO2': ['sum', 'first', 'last', 'max', 'min'],
+        'NOX': ['sum', 'first', 'last', 'max', 'min'],
+        'CO': ['sum', 'first', 'last', 'max', 'min'],
+        'NMVOC': ['sum', 'first', 'last', 'max', 'min'],
+        'PM': ['sum', 'first', 'last', 'max', 'min'],
+        'SO2': ['sum', 'first', 'last', 'max', 'min']
     }).reset_index()
 
     daily_emissions.columns = ['date', 
