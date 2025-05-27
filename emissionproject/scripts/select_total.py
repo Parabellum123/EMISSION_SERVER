@@ -1,10 +1,11 @@
+#select_total.py
 import pandas as pd
 from sqlalchemy import create_engine
 
 def main():
     # PostgreSQL database connection parameters
     db_user = 'postgres'
-    db_password = 'Achmadriadi@123'
+    db_password = 'Achmadriadi%40123'
     db_host = '156.67.216.241'
     db_port = '5432'
     db_name = 'emissionprojectdb'
@@ -13,7 +14,7 @@ def main():
     engine = create_engine(f'postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}')
 
     # Read the emission data from the database
-    query = 'SELECT CO2, NOX, CO, NMVOC, PM, SO2 FROM select_emission'
+    query = 'SELECT "CO2", "NOX", "CO", "NMVOC", "PM", "SO2" FROM "select_emission"'
     df = pd.read_sql(query, engine)
 
     # Calculate the total emission for each emission type

@@ -1,10 +1,11 @@
+#select_emission.py
 import pandas as pd
 from sqlalchemy import create_engine
 import sys
 
 # PostgreSQL database connection parameters
 db_user = 'postgres'
-db_password = 'Achmadriadi@123'
+db_password = 'Achmadriadi%40123'
 db_host = '156.67.216.241'
 db_port = '5432'
 db_name = 'emissionprojectdb'
@@ -17,7 +18,7 @@ def filter_data(selected_mmsi):
     # Query to fetch data from 'emission_output_final' table
     query = """
         SELECT mmsi, start_timestamp, end_timestamp, start_latitude, start_longitude, 
-               CO2, NOX, CO, NMVOC, PM, SO2 
+               "CO2", "NOX", "CO", "NMVOC", "PM", "SO2" 
         FROM emission_output_final
     """
 

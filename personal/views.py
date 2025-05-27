@@ -179,7 +179,7 @@ def filter_mmsi(request):
     mmsi = request.GET.get('mmsi')
     if mmsi:
         # Change the working directory to the one containing the script
-        script_dir = os.path.join(os.path.dirname(__file__), '../scripts')
+        script_dir = os.path.join(os.path.dirname(__file__), '../emissionproject/scripts')
         subprocess.run(["python", os.path.join(script_dir, "calculateselect.py"), mmsi], check=True)
 
         # Fetch ship data
@@ -233,6 +233,7 @@ def fetch_ship_data(mmsi):
         """
         cursor.execute(query, (mmsi,))
         row = cursor.fetchone()
+        print("DEBUG First Attempt:", row)
 
         if not row:
             # Fallback jika tidak ditemukan
@@ -245,12 +246,17 @@ def fetch_ship_data(mmsi):
             """
             cursor.execute(query, (mmsi,))
             row = cursor.fetchone()
+            print("DEBUG Fallback Attempt:", row)
 
         if row:
-            columns = [desc[0] for desc in cursor.description]
-            result = dict(zip(columns, row))
+            result = dict(row)
+
+            result['name'] = result.pop('vessel_name', 'N/A')
+            result['imo'] = result.pop('imo_number', 'N/A')
+            print("DEBUG Final Result:", result)
         else:
             result = {}
+
     finally:
         cursor.close()
         conn.close()
@@ -479,11 +485,12 @@ def fetch_mmsi_daily_emissions(mmsi):
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     query = """
-    SELECT date, mmsitotal_CO2, mmsitotal_NOX, mmsitotal_CO, mmsitotal_NMVOC, mmsitotal_PM, mmsitotal_SO2
+    SELECT date, "mmsitotal_CO2", "mmsitotal_NOX", "mmsitotal_CO", "mmsitotal_NMVOC", "mmsitotal_PM", "mmsitotal_SO2"
     FROM select_daily
     WHERE mmsi = %s
     ORDER BY date ASC
     """
+
     cursor.execute(query, (mmsi,))
     results = cursor.fetchall()
 
