@@ -1,3 +1,5 @@
+#/root/emissionfolder/emissionproject/baltic_scraper/baltic_scraper/spiders/vessel.py
+
 import pandas as pd
 import time
 import re
@@ -26,11 +28,15 @@ def get_new_vessels(engine):
     query = '''
         SELECT a.mmsi, a.imo
         FROM ais_vessel a
-        WHERE a.imo IS NOT NULL AND a.imo != 0 AND a.mmsi IS NOT NULL;
+        LEFT JOIN scraping_data v ON a.imo = v.imo_number
+        WHERE a.imo IS NOT NULL 
+        AND a.imo != 0 
+        AND a.mmsi IS NOT NULL
+        AND v.imo_number IS NULL;
     '''
     df = pd.read_sql(query, engine)
     if df.empty:
-        print("Tidak ada data IMO untuk di-scrape.")
+        print("Tidak ada IMO baru untuk di-scrape.")
         return []
     return df.to_dict(orient="records")
 

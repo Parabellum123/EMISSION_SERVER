@@ -1,3 +1,4 @@
+<!-- /root/emissionfolder/personal/templates/base.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -140,7 +141,10 @@
     <header class="bg-blue-600 text-white p-4 flex justify-between items-center">
         <h1 class="text-2xl font-bold">Ship Emission Monitoring</h1>
         <div class="text-right flex items-center">
+            <button id="update-vessel-btn" class="bg-yellow-500 text-white px-4 py-2 rounded-md">Update Vessel</button>
+                <span id="update-vessel-status" class="ml-4 text-yellow-200 font-semibold"></span>
             <button id="run-calculation" class="bg-red-600 text-white px-4 py-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Run Calculation</button>
+            <p id="run-calculation-status" class="ml-4 text-green-200 font-semibold"></p>
             <p class="ml-4">Data Entries: <span id="data-count" class="font-semibold">0</span></p>
         </div>
     </header>
@@ -162,7 +166,6 @@
                                 <option value="all">All</option>
                                 <option value="cargo">Cargo</option>
                                 <option value="tanker">Tanker</option>
-                                <option value="passenger">Passenger</option>
                             </select>
                         </div>
                         <div class="control-section text-right">
@@ -1115,6 +1118,31 @@
             });
         });
 
+        $('#update-vessel-btn').on('click', function () {
+            console.log("🟡 Tombol Update Vessel diklik");
+            $('#update-vessel-status').text("⏳ Memproses update vessel...");
+
+            $.ajax({
+                url: '/update_vessel/',
+                method: 'GET',
+                success: function (response) {
+                    console.log("🟢 AJAX sukses:", response);
+                    if (response.status === 'success') {
+                        $('#update-vessel-status').text("✅ " + response.message);
+                    } else {
+                        $('#update-vessel-status').text("❌ " + response.message);
+                    }
+                },
+                error: function (err) {
+                    console.error("🔴 AJAX gagal:", err);
+                    $('#update-vessel-status').text("❌ Terjadi kesalahan: " + err.responseText);
+                }
+            });
+        });
+
+
+
+
 
         // Initialize the map
         google.maps.event.addDomListener(window, 'load', initMap);
@@ -1122,5 +1150,40 @@
 
     <!-- Google Maps Script -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDYVkD9WZCA_QrTWomoOWt2BK6D55e-tNM&callback=initMap" async defer></script>
+
+    <script>
+    $('#run-calculation').on('click', function () {
+        const startDate = $('#start_date').val();
+        const endDate = $('#end_date').val();
+
+        $('#run-calculation-status').text("⏳ Memulai perhitungan...");
+
+        $.post('/start_calculation/', {
+            start_date: startDate,
+            end_date: endDate
+        }, function (response) {
+            const taskId = response.task_id;
+            checkCalculationStatus(taskId);
+        });
+    });
+
+    function checkCalculationStatus(taskId) {
+        const interval = setInterval(function () {
+            $.get('/check_calculation_status/', { task_id: taskId }, function (response) {
+                if (response.status === 'completed') {
+                    clearInterval(interval);
+                    $('#run-calculation-status').text("✅ Perhitungan selesai!");
+                    // bisa trigger fetch data juga di sini
+                } else if (response.status === 'failed') {
+                    clearInterval(interval);
+                    $('#run-calculation-status').text("❌ Perhitungan gagal.");
+                } else {
+                    $('#run-calculation-status').text("⏳ Masih dalam proses...");
+                }
+            });
+        }, 2000); // setiap 2 detik
+    }
+    </script>
+
 </body>
 </html>

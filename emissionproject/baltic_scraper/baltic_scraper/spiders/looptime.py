@@ -4,7 +4,7 @@ from Scrapingloop import main  # fungsi main scraping kamu
 
 # Atur waktu tunggu (dalam detik)
 # 1 hari = 86400 detik
-SCRAPE_INTERVAL = 259200    # bisa kamu ubah ke 43200 (12 jam), 432000 (5 hari), dll
+SCRAPE_INTERVAL = 86400    # bisa kamu ubah ke 43200 (12 jam), 432000 (5 hari), dll
 
 def loop_scraper():
     while True:

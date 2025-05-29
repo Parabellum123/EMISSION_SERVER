@@ -1,4 +1,4 @@
-# src/emissionsite/urls.py
+# /root/emissionfolder/emissionsite/urls.py
 from django.contrib import admin
 from django.urls import path
 from personal import views
@@ -9,4 +9,5 @@ urlpatterns = [
     path('run_calculation/', views.run_calculation, name='run_calculation'),
     path('filter_mmsi/', views.filter_mmsi, name='filter_mmsi'),
     path('fetch_points_data/', views.fetch_points_data, name='fetch_points_data'),
+    path('update_vessel/', views.update_vessel, name='update_vessel'),  # ✅ Tambahkan ini
 ]

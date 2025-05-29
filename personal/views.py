@@ -1,18 +1,72 @@
+#/root/emissionfolder/personal/views.py
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from django.template.loader import render_to_string
 from emissionproject.scripts.calculations import run_scripts
 from emissionproject.scripts.calculateselect import run_filter
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from django.core.paginator import Paginator
+import threading
+import time
+import uuid
 import subprocess
 import os
 import psycopg2
 import psycopg2.extras
 
+CALCULATION_STATUS = {}
+
+@csrf_exempt
+def start_calculation(request):
+    task_id = str(uuid.uuid4())
+    CALCULATION_STATUS[task_id] = 'pending'
+
+    def background_job():
+        try:
+            CALCULATION_STATUS[task_id] = 'running'
+            time.sleep(15)  # Simulasi proses lama (ganti dengan real calc)
+            # Jalankan fungsi kamu di sini, contoh:
+            # run_calculation_process(request.GET.get('start_date'), request.GET.get('end_date'))
+            CALCULATION_STATUS[task_id] = 'completed'
+        except:
+            CALCULATION_STATUS[task_id] = 'failed'
+
+    threading.Thread(target=background_job).start()
+
+    return JsonResponse({'task_id': task_id})
+
+def check_calculation_status(request):
+    task_id = request.GET.get('task_id')
+    status = CALCULATION_STATUS.get(task_id, 'not_found')
+    return JsonResponse({'status': status})
 
 
 def home(request):
     return render(request, 'base.html')
+
+@require_GET
+def update_vessel(request):
+    print("✅ update_vessel dipanggil")  # Tambahan debug
+    try:
+        script_path = '/root/emissionfolder/emissionproject/baltic_scraper/baltic_scraper/spiders/vessel.py'
+        venv_python = '/root/.venv/bin/python'
+
+        result = subprocess.run(
+            [venv_python, script_path],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0:
+            return JsonResponse({'status': 'success', 'message': ' Data vessel berhasil diperbarui.', 'log': result.stdout})
+        else:
+            return JsonResponse({'status': 'error', 'message': '❌ Gagal menjalankan script vessel.py:\n' + result.stderr})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'❌ Terjadi error saat update vessel: {str(e)}'})
+
 
 def run_calculation(request):
     start_date_str = request.GET.get('start_date')
@@ -25,6 +79,8 @@ def run_calculation(request):
     end_date_obj = datetime.strptime(end_date_str, '%m/%d/%Y')
     start_date_str = start_date_obj.strftime('%Y-%m-%d')
     end_date_str = end_date_obj.strftime('%Y-%m-%d')
+    print(f"Start Date: {start_date_str}, End Date: {end_date_str}")  # Tambahan debug
+    # Log the date range
 
 
     # Run the calculations and get the AIS data count
@@ -97,7 +153,8 @@ def run_calculation(request):
     except Exception as e:
         print(f"[ERROR] Gagal render mmsi_options.html: {e}")
         mmsi_options_html = "<div>Gagal memuat pilihan MMSI.</div>"
-
+    
+    
     return JsonResponse({
         'total_emissions_html': total_emissions_html,
         'emission_table_html': emission_table_html,
@@ -126,8 +183,14 @@ def run_calculation(request):
         'total_pm': total_emissions.get('PM', 0),
         'total_so2': total_emissions.get('SO2', 0),
         'emission_percentages': emission_percentages,  # Add percentages to response
-        'candlestick_data': candlestick_data  # Add candlestick data to the response
+        'candlestick_data': candlestick_data,  # Add candlestick data to the response
+        'status': 'success',
+        'message': '✅ Success!',
+        'status': 'error',
+        'message': 'Gagal'
     })
+
+
 
 @require_GET
 def fetch_points_data(request):
