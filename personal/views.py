@@ -7,41 +7,17 @@ from emissionproject.scripts.calculations import run_scripts
 from emissionproject.scripts.calculateselect import run_filter
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
-from django.core.paginator import Paginator
 import threading
-import time
-import uuid
+from datetime import datetime
 import subprocess
 import os
 import psycopg2
 import psycopg2.extras
+import redis
+import json
 
-CALCULATION_STATUS = {}
-
-@csrf_exempt
-def start_calculation(request):
-    task_id = str(uuid.uuid4())
-    CALCULATION_STATUS[task_id] = 'pending'
-
-    def background_job():
-        try:
-            CALCULATION_STATUS[task_id] = 'running'
-            time.sleep(15)  # Simulasi proses lama (ganti dengan real calc)
-            # Jalankan fungsi kamu di sini, contoh:
-            # run_calculation_process(request.GET.get('start_date'), request.GET.get('end_date'))
-            CALCULATION_STATUS[task_id] = 'completed'
-        except:
-            CALCULATION_STATUS[task_id] = 'failed'
-
-    threading.Thread(target=background_job).start()
-
-    return JsonResponse({'task_id': task_id})
-
-def check_calculation_status(request):
-    task_id = request.GET.get('task_id')
-    status = CALCULATION_STATUS.get(task_id, 'not_found')
-    return JsonResponse({'status': status})
-
+# Redis connection (default port 6379)
+redis_client = redis.Redis(host='localhost', port=6379, db=0)
 
 def home(request):
     return render(request, 'base.html')
@@ -429,6 +405,11 @@ def count_unique_mmsi():
     return unique_mmsi_count
 
 def fetch_results_from_db(start_date_str, end_date_str):
+    cache_key = f"results_{start_date_str}_{end_date_str}"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
     conn = psycopg2.connect(
         dbname="emissionprojectdb",
         user="postgres",
@@ -436,9 +417,7 @@ def fetch_results_from_db(start_date_str, end_date_str):
         host="156.67.216.241",
         port="5432"
     )
-
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
     query = """
     SELECT mmsi, vessel_type, start_timestamp, start_latitude, start_longitude,
         end_timestamp, "CO2", "NOX", "CO", "NMVOC", "PM", "SO2"
@@ -447,13 +426,24 @@ def fetch_results_from_db(start_date_str, end_date_str):
     """
     cursor.execute(query, (start_date_str, end_date_str))
     results = cursor.fetchall()
-
     cursor.close()
     conn.close()
 
+    # Convert datetime/date fields to string for JSON serialization
+    for row in results:
+        for key in ['start_timestamp', 'end_timestamp']:
+            if key in row and isinstance(row[key], (datetime, )):
+                row[key] = row[key].isoformat()
+
+    redis_client.setex(cache_key, 300, json.dumps(results))
     return results
 
 def fetch_emission_output_data():
+    cache_key = "emission_output_data"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
     conn = psycopg2.connect(
         dbname="emissionprojectdb",
         user="postgres",
@@ -461,9 +451,7 @@ def fetch_emission_output_data():
         host="156.67.216.241",
         port="5432"
     )
-
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
     query = """
     SELECT mmsi, vessel_type, 
            TO_CHAR(start_timestamp, 'YYYY-MM-DD HH24:MI:SS') as start_timestamp, 
@@ -474,13 +462,18 @@ def fetch_emission_output_data():
     """
     cursor.execute(query)
     results = cursor.fetchall()
-
     cursor.close()
     conn.close()
 
+    redis_client.setex(cache_key, 300, json.dumps(results))
     return results
 
 def fetch_total_daily_data():
+    cache_key = "total_daily_data"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
     conn = psycopg2.connect(
         dbname="emissionprojectdb",
         user="postgres",
@@ -488,9 +481,7 @@ def fetch_total_daily_data():
         host="156.67.216.241",
         port="5432"
     )
-
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
     query = """
     SELECT date, 
         "total_CO2", "open_CO2", "close_CO2", "high_CO2", "low_CO2",
@@ -504,13 +495,23 @@ def fetch_total_daily_data():
     """
     cursor.execute(query)
     results = cursor.fetchall()
-
     cursor.close()
     conn.close()
 
+    for row in results:
+        if isinstance(row['date'], (str, type(None))):
+            continue
+        row['date'] = row['date'].isoformat()
+
+    redis_client.setex(cache_key, 300, json.dumps(results))
     return results
 
 def fetch_total_emissions():
+    cache_key = "total_emissions"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
     conn = psycopg2.connect(
         dbname="emissionprojectdb",
         user="postgres",
@@ -518,25 +519,26 @@ def fetch_total_emissions():
         host="156.67.216.241",
         port="5432"
     )
-
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
     query = """
     SELECT emission_type, total
     FROM total_emission
     """
     cursor.execute(query)
     results = cursor.fetchall()
-
     cursor.close()
     conn.close()
 
-    # Convert results to a dictionary
     total_emissions = {entry['emission_type']: entry['total'] for entry in results}
-
+    redis_client.setex(cache_key, 300, json.dumps(total_emissions))
     return total_emissions
 
-def fetch_mmsi_daily_emissions(mmsi):
+def fetch_unique_mmsi_options():
+    cache_key = "unique_mmsi_options"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
     conn = psycopg2.connect(
         dbname="emissionprojectdb",
         user="postgres",
@@ -544,25 +546,179 @@ def fetch_mmsi_daily_emissions(mmsi):
         host="156.67.216.241",
         port="5432"
     )
-
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    query = """
+    SELECT DISTINCT mmsi
+    FROM emission_output_final
+    """
+    cursor.execute(query)
+    results = cursor.fetchall()
+    cursor.close()
+    conn.close()
 
+    redis_client.setex(cache_key, 300, json.dumps(results))
+    return results
+
+def count_unique_mmsi():
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
+    )
+    cursor = conn.cursor()
+
+    query = """
+    SELECT COUNT(DISTINCT mmsi) as unique_mmsi_count
+    FROM emission_output_final
+    """
+    cursor.execute(query)
+    result = cursor.fetchone()
+    unique_mmsi_count = result[0] if result else 0
+
+    cursor.close()
+    conn.close()
+
+    # Log the unique MMSI count
+    print(f"Unique MMSI Count: {unique_mmsi_count}")
+
+    return unique_mmsi_count
+
+def fetch_points_data_from_db(mmsi):
+    cache_key = f"points_{mmsi}"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
+    )
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    if mmsi and mmsi != 'all':
+        query = """
+        SELECT mmsi, vessel_type, start_timestamp, start_latitude, start_longitude,
+            "CO2", "NOX", "CO", "NMVOC", "PM", "SO2"
+        FROM emission_output_final
+        WHERE mmsi = %s
+        ORDER BY start_timestamp ASC
+        """
+        cursor.execute(query, (mmsi,))
+    else:
+        query = """
+        SELECT mmsi, vessel_type, start_timestamp, start_latitude, start_longitude,
+            "CO2", "NOX", "CO", "NMVOC", "PM", "SO2"
+        FROM emission_output_final
+        ORDER BY start_timestamp ASC
+        """
+        cursor.execute(query)
+    points = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    redis_client.setex(cache_key, 300, json.dumps(points))
+    return points
+
+def fetch_mmsi_emission_data():
+    cache_key = "mmsi_emission_data"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
+    )
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    query = """
+    SELECT mmsi, 
+        TO_CHAR(start_timestamp, 'YYYY-MM-DD HH24:MI:SS') as start_timestamp, 
+        TO_CHAR(end_timestamp, 'YYYY-MM-DD HH24:MI:SS') as end_timestamp, 
+        start_latitude, start_longitude, 
+        "CO2", "NOX", "CO", "NMVOC", "PM", "SO2"
+    FROM select_emission
+    ORDER BY start_timestamp ASC
+    """
+    cursor.execute(query)
+    results = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    redis_client.setex(cache_key, 300, json.dumps(results))
+    return results
+
+def fetch_mmsi_total_emissions():
+    cache_key = "mmsi_total_emissions"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
+    )
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    query = """
+    SELECT emission_type, mmsi_total
+    FROM select_total
+    """
+    cursor.execute(query)
+    results = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    redis_client.setex(cache_key, 300, json.dumps(results))
+    return results
+
+def fetch_mmsi_daily_emissions(mmsi):
+    cache_key = f"mmsi_daily_emissions_{mmsi}"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
+    )
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     query = """
     SELECT date, "mmsitotal_CO2", "mmsitotal_NOX", "mmsitotal_CO", "mmsitotal_NMVOC", "mmsitotal_PM", "mmsitotal_SO2"
     FROM select_daily
     WHERE mmsi = %s
     ORDER BY date ASC
     """
-
     cursor.execute(query, (mmsi,))
     results = cursor.fetchall()
-
     cursor.close()
     conn.close()
 
+    for row in results:
+        if isinstance(row['date'], (str, type(None))):
+            continue
+        row['date'] = row['date'].isoformat()
+
+    redis_client.setex(cache_key, 300, json.dumps(results))
     return results
 
-def calculate_mmsi_average_emissions(mmsi):
+def fetch_ship_data(mmsi):
+    cache_key = f"ship_data_{mmsi}"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
     conn = psycopg2.connect(
         dbname="emissionprojectdb",
         user="postgres",
@@ -570,30 +726,46 @@ def calculate_mmsi_average_emissions(mmsi):
         host="156.67.216.241",
         port="5432"
     )
-
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        query = """
+        SELECT mmsi, imo_number, vessel_name, vessel_type, length, breadth AS width, draught,
+               engine_type, engine_model, engine_power, deadweight
+        FROM vessel_data
+        WHERE mmsi = %s AND length > breadth
+        LIMIT 1
+        """
+        cursor.execute(query, (mmsi,))
+        row = cursor.fetchone()
+        if not row:
+            query = """
+            SELECT mmsi, imo_number, vessel_name, vessel_type, length, breadth AS width, draught,
+                   engine_type, engine_model, engine_power, deadweight
+            FROM vessel_data
+            WHERE mmsi = %s
+            LIMIT 1
+            """
+            cursor.execute(query, (mmsi,))
+            row = cursor.fetchone()
+        if row:
+            result = dict(row)
+            result['name'] = result.pop('vessel_name', 'N/A')
+            result['imo'] = result.pop('imo_number', 'N/A')
+        else:
+            result = {}
+    finally:
+        cursor.close()
+        conn.close()
 
-    query = """
-    SELECT 
-        AVG("CO2") as avg_co2, 
-        AVG("NOX") as avg_nox, 
-        AVG("CO") as avg_co, 
-        AVG("NMVOC") as avg_nmvoc, 
-        AVG("PM") as avg_pm, 
-        AVG("SO2") as avg_so2
-        FROM select_emission
-    WHERE mmsi = %s
-    """
-
-    cursor.execute(query, (mmsi,))
-    result = cursor.fetchone()
-
-    cursor.close()
-    conn.close()
-
+    redis_client.setex(cache_key, 300, json.dumps(result))
     return result
 
 def fetch_candlestick_data():
+    cache_key = "candlestick_data"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
     conn = psycopg2.connect(
         dbname="emissionprojectdb",
         user="postgres",
@@ -601,9 +773,7 @@ def fetch_candlestick_data():
         host="156.67.216.241",
         port="5432"
     )
-
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
     query = """
     SELECT date, 
         "total_CO2", "open_CO2", "close_CO2", "high_CO2", "low_CO2", 
@@ -615,11 +785,47 @@ def fetch_candlestick_data():
     FROM total_daily
     ORDER BY date ASC
     """
-
     cursor.execute(query)
     results = cursor.fetchall()
-
     cursor.close()
     conn.close()
 
+    for row in results:
+        if isinstance(row['date'], (str, type(None))):
+            continue
+        row['date'] = row['date'].isoformat()
+
+    redis_client.setex(cache_key, 300, json.dumps(results))
     return results
+
+def calculate_mmsi_average_emissions(mmsi):
+    cache_key = f"mmsi_avg_emissions_{mmsi}"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
+    )
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    query = """
+    SELECT AVG("CO2") as avg_CO2,
+           AVG("NOX") as avg_NOX,
+           AVG("CO") as avg_CO,
+           AVG("NMVOC") as avg_NMVOC,
+           AVG("PM") as avg_PM,
+           AVG("SO2") as avg_SO2
+    FROM select_emission
+    WHERE mmsi = %s
+    """
+    cursor.execute(query, (mmsi,))
+    result = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    redis_client.setex(cache_key, 300, json.dumps(result))
+    return result

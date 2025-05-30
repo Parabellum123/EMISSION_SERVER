@@ -34,3 +34,6 @@ redis
 
 # WSGI Server (optional production)
 gunicorn
+
+celery redis
+redis-server

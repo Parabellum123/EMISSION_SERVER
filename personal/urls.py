@@ -4,6 +4,8 @@ from .views import run_calculation, update_vessel
 from django.contrib import admin
 from django.urls import path, include
 
+from emissionfolder.personal import views
+
 
 
 urlpatterns = [
