@@ -54,41 +54,39 @@ def main():
         "Barge": "Rest"
     }
 
-    # Buat kolom kategori utama
-    df['vessel_main_type'] = df['vessel_type'].map(vessel_type_map).fillna("Rest")
-
-    # Filter hanya Cargo dan Tanker
-    df_filtered = df[df['vessel_main_type'].isin(['Cargo', 'Tanker'])].copy()
-
-    # Fungsi perhitungan
     def calculate_mcr_and_aux_power(engine_power, vessel_type_raw, length, breadth):
         vessel_type = vessel_type_map.get(vessel_type_raw, "Rest")
-
         if not length or not breadth:
             return (None, None)
-
         lw = length * breadth
-
         if vessel_type == "Tanker":
             mcr = 3.32e-5 * (lw)**2 + 0.27 * lw + 57.20
         elif vessel_type == "Cargo":
             mcr = 7.52e-5 * (lw)**2 + 0.59 * lw - 41.48
         else:
             mcr = 0  # fallback default
-
         ratio = next((r[1] for r in ratio_data if r[0] == vessel_type), 0.22)
         aux_power = mcr * ratio
         return (round(mcr, 2), round(aux_power, 2))
 
-    # Terapkan fungsi ke setiap baris
-    df_filtered[['mcr', 'auxiliary_engine_power']] = df.apply(
-        lambda row: pd.Series(calculate_mcr_and_aux_power(
+    # Terapkan fungsi ke setiap baris, hasilkan dua kolom baru
+    mcr_aux_list = df.apply(
+        lambda row: calculate_mcr_and_aux_power(
             row['engine_power'],
             row['vessel_type'],
             row['length'],
             row['breadth']
-        )), axis=1
-    )
+        ), axis=1
+    ).tolist()
+
+    # Buat DataFrame dari hasil apply
+    mcr_aux_df = pd.DataFrame(mcr_aux_list, columns=['mcr', 'auxiliary_engine_power'])
+
+    # Gabungkan ke df utama
+    df = pd.concat([df.reset_index(drop=True), mcr_aux_df], axis=1)
+
+    # Drop baris yang gagal dihitung (hasil None)
+    df = df[df['mcr'].notnull() & df['auxiliary_engine_power'].notnull()]
 
     # Simpan ke PostgreSQL
     try:
