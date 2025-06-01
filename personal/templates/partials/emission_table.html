@@ -1,0 +1,18 @@
+{% for row in results %}
+<tr>
+    <td>{{ row.mmsi }}</td>
+    <td>{{ row.start_timestamp }}</td>
+    <td>{{ row.end_timestamp }}</td>
+    <td>{{ row.vessel_type }}</td>
+    <td>{{ row.CO2|default:"-" }}</td>
+    <td>{{ row.NOX|default:"-" }}</td>
+    <td>{{ row.CO|default:"-" }}</td>
+    <td>{{ row.NMVOC|default:"-" }}</td>
+    <td>{{ row.PM|default:"-" }}</td>
+    <td>{{ row.SO2|default:"-" }}</td>
+</tr>
+{% empty %}
+<tr>
+    <td colspan="10" class="text-center">No emission data available.</td>
+</tr>
+{% endfor %}

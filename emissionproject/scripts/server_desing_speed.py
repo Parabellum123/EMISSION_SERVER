@@ -26,8 +26,8 @@ def main():
     # Ambil data dari emission_ready_segments + output_mcr_and_aux_power
     query = """
         SELECT DISTINCT m.mmsi, m.vessel_type, m.deadweight, p.mcr
-        FROM emission_ready_segments m
-        LEFT JOIN output_mcr_and_aux_power p ON m.mmsi = p.mmsi
+        FROM emission_ready_segments_view m
+        INNER JOIN output_mcr_and_aux_power p ON m.mmsi = p.mmsi
         WHERE m.deadweight IS NOT NULL AND p.mcr IS NOT NULL
     """
     df = pd.read_sql(query, conn)
@@ -38,17 +38,16 @@ def main():
 
     # Mapping vessel_type mentah → kategori vessel_type_ap
     vessel_type_map = {
-        "Container ship": "Container",
-        "Car carrier": "Container",
-        "Bulk carrier": "Container",
-        "Cement carrier": "Container",
-        "General cargo vessel": "Container",
-        "Oil tanker": "Tanker",
-        "Chemical tanker": "Tanker",
-        "Chemical/Oil tanker": "Tanker",
-        "LPG carrier": "Tanker"
+    "Container ship": "Cargo",
+    "Car carrier": "Cargo",
+    "Bulk carrier": "Cargo",
+    "Cement carrier": "Cargo",
+    "General cargo vessel": "Cargo",
+    "Oil tanker": "Tanker",
+    "Chemical tanker": "Tanker",
+    "Chemical/Oil tanker": "Tanker",
+    "LPG carrier": "Tanker"
     }
-
     df['vessel_type_ap'] = df['vessel_type'].map(vessel_type_map)
 
     # Fungsi menghitung design speed
@@ -62,7 +61,7 @@ def main():
                 return None
             if vtype == "Tanker":
                 return ((mcr / (2.66 * dwt**0.6)) ** (1 / 0.6))
-            elif vtype == "Container":
+            elif vtype == "Cargo":
                 return ((mcr / (4.297 * dwt**0.6)) ** (1 / 0.4))
             else:
                 return None

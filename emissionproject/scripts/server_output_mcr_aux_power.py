@@ -1,3 +1,4 @@
+#Server_output_mcr_aux_power.py
 import pandas as pd
 import psycopg2
 from sqlalchemy import create_engine
@@ -23,7 +24,7 @@ def main():
     # Ambil data dari emission_ready_segments
     cursor.execute("""
         SELECT DISTINCT mmsi, vessel_type, length, breadth, engine_power
-        FROM emission_ready_segments
+        FROM emission_ready_segments_view
     """)
     vessel_data = cursor.fetchall()
 
@@ -35,17 +36,17 @@ def main():
 
     # Mapping vessel type ke kategori utama
     vessel_type_map = {
-        "Container ship": "Container",
-        "Car carrier": "Container",
-        "Bulk carrier": "Container",
-        "Cement carrier": "Container",
-        "General cargo vessel": "Container",
+        "Container ship": "Cargo",
+        "Car carrier": "Cargo",
+        "Bulk carrier": "Cargo",
+        "Cement carrier": "Cargo",
+        "General cargo vessel": "Cargo",
         "Oil tanker": "Tanker",
         "Chemical tanker": "Tanker",
         "Chemical/Oil tanker": "Tanker",
         "LPG carrier": "Tanker",
         "Passenger vessel": "Passenger",
-        "RO-RO": "Ro-ro",
+        "RO-RO": "Passenger",
         "Tug boat": "Rest",
         "Crew boat": "Rest",
         "Offshore supply vessel": "Rest",
@@ -53,32 +54,34 @@ def main():
         "Barge": "Rest"
     }
 
+    # Buat kolom kategori utama
+    df['vessel_main_type'] = df['vessel_type'].map(vessel_type_map).fillna("Rest")
+
+    # Filter hanya Cargo dan Tanker
+    df_filtered = df[df['vessel_main_type'].isin(['Cargo', 'Tanker'])].copy()
+
     # Fungsi perhitungan
     def calculate_mcr_and_aux_power(engine_power, vessel_type_raw, length, breadth):
         vessel_type = vessel_type_map.get(vessel_type_raw, "Rest")
 
-        # Jika power sudah ada dari scraping
-        if engine_power and engine_power > 0:
-            mcr = engine_power
+        if not length or not breadth:
+            return (None, None)
+
+        lw = length * breadth
+
+        if vessel_type == "Tanker":
+            mcr = 3.32e-5 * (lw)**2 + 0.27 * lw + 57.20
+        elif vessel_type == "Cargo":
+            mcr = 7.52e-5 * (lw)**2 + 0.59 * lw - 41.48
         else:
-            if not length or not breadth:
-                return (None, None)
-
-            lw = length * breadth
-
-            if vessel_type == "Tanker":
-                mcr = 3.32e-5 * (lw)**2 + 0.27 * lw + 57.20
-            elif vessel_type == "Container":
-                mcr = 7.52e-5 * (lw)**2 + 0.59 * lw - 41.48
-            else:
-                mcr = 2000  # default fallback
+            mcr = 0  # fallback default
 
         ratio = next((r[1] for r in ratio_data if r[0] == vessel_type), 0.22)
         aux_power = mcr * ratio
         return (round(mcr, 2), round(aux_power, 2))
 
     # Terapkan fungsi ke setiap baris
-    df[['mcr', 'auxiliary_engine_power']] = df.apply(
+    df_filtered[['mcr', 'auxiliary_engine_power']] = df.apply(
         lambda row: pd.Series(calculate_mcr_and_aux_power(
             row['engine_power'],
             row['vessel_type'],

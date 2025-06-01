@@ -24,6 +24,7 @@ ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '156.67.216.241,localhost').sp
 # ✅ Aplikasi yang digunakan
 INSTALLED_APPS = [
     'personal',
+    'django_extensions',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

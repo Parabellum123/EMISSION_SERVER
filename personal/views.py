@@ -452,6 +452,7 @@ def fetch_emission_output_data():
         port="5432"
     )
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
     query = """
     SELECT mmsi, vessel_type, 
            TO_CHAR(start_timestamp, 'YYYY-MM-DD HH24:MI:SS') as start_timestamp, 
@@ -459,6 +460,7 @@ def fetch_emission_output_data():
            "CO2", "NOX", "CO", "NMVOC", "PM", "SO2"
     FROM emission_output_final
     ORDER BY start_timestamp ASC
+    LIMIT 200
     """
     cursor.execute(query)
     results = cursor.fetchall()
@@ -699,6 +701,7 @@ def fetch_mmsi_daily_emissions(mmsi):
     FROM select_daily
     WHERE mmsi = %s
     ORDER BY date ASC
+    LIMIT 200
     """
     cursor.execute(query, (mmsi,))
     results = cursor.fetchall()

@@ -1,3 +1,4 @@
+# /root/emissionfolder/emissionproject/scripts/Server_interpolate_position_segments.py
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
@@ -31,6 +32,10 @@ def interpolate_positions_from_cleaned_segments():
 
     output_rows = []
 
+    # Parameter untuk koreksi kecepatan
+    delta = 0.1
+    k = 0.5
+
     for _, row in df.iterrows():
         mmsi = row['mmsi']
         lat_p = row['lat_start']
@@ -44,6 +49,7 @@ def interpolate_positions_from_cleaned_segments():
         t_p = row['start_time']
         t_q = row['end_time']
 
+        # Kondisi 1: skip jika kapal berlabuh
         if speed_p < 0.5 or speed_q < 0.5:
             continue
 
@@ -51,12 +57,27 @@ def interpolate_positions_from_cleaned_segments():
         if delta_t == 0:
             continue
 
+        # Hitung vmin, vmax, dan Rpq
+        vmin = min(speed_p, speed_q)
+        vmax = max(speed_p, speed_q)
+        Rpq = vmin / vmax if vmax != 0 else 1
+
+        # Koreksi kecepatan jika Rpq < delta
+        if Rpq < delta:
+            vmin = k * vmax
+            if speed_p < speed_q:
+                speed_p = vmin
+            else:
+                speed_q = vmin
+
+        # Konversi ke m/s
+        v_p = speed_p / 3600
+        v_q = speed_q / 3600
+
+        # Hitung titik interpolasi
         t_interp = t_p + timedelta(seconds=delta_t / 2)
         delta_tp = delta_t / 2
         delta_tq = delta_t / 2
-
-        v_p = speed_p / 3600
-        v_q = speed_q / 3600
 
         theta_p = radians(course_p)
         theta_q = radians(course_q)
@@ -83,6 +104,7 @@ def interpolate_positions_from_cleaned_segments():
             'course_q': course_q,
             'Wp': Wp,
             'Wq': Wq,
+            'Rpq': Rpq,
             'interpolated': True
         })
 

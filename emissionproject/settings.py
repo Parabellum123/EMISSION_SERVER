@@ -31,7 +31,8 @@ ALLOWED_HOSTS = ['156.67.216.241']
 # Application definition
 
 INSTALLED_APPS = [
-    'emissionapp.apps.EmissionappConfig',
+    'django_extensions',
+    'personal',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

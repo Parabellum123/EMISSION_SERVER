@@ -1,3 +1,4 @@
+#/root/emissionfolder/emissionproject/scripts/Server_calculate_emissions.py
 import os
 import sys
 from datetime import datetime
@@ -58,8 +59,8 @@ def calculate_emissions(start_date, end_date):
 
         # 5️⃣ Join semua data berdasarkan MMSI
         df = segments_df \
-            .join(design_df, on="mmsi", how="left") \
-            .join(power_df, on="mmsi", how="left") \
+            .join(design_df, on="mmsi", how="INNER") \
+            .join(power_df, on="mmsi", how="INNER") \
             .crossJoin(ef_df)
 
         # 6️⃣ Hitung load_ratio = AS / MS
@@ -70,10 +71,10 @@ def calculate_emissions(start_date, end_date):
         for gas in emissions:
             df = df.withColumn(gas,
                 when(col("speed_avg") > 3,
-                    (col("mcr") * pow(col("load_ratio"), 3) * col("duration_hr") * col(f"main_engine_emission_{gas}") +
-                     col("auxiliary_engine_power") * col("duration_hr") * col(f"auxiliary_engine_emission_{gas}")))
+                    ((col("mcr") * pow(col("load_ratio"), 3) * col("duration_hr") * col(f"main_engine_emission_{gas}") +
+                    col("auxiliary_engine_power") * col("duration_hr") * col(f"auxiliary_engine_emission_{gas}")) / 1000))
                 .otherwise(
-                    col("auxiliary_engine_power") * col("duration_hr") * col(f"auxiliary_engine_emission_{gas}")
+                    (col("auxiliary_engine_power") * col("duration_hr") * col(f"auxiliary_engine_emission_{gas}") / 1000)
                 )
             )
 
