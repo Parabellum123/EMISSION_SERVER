@@ -12,7 +12,7 @@ def run_scripts(start_date_str, end_date_str):
         print("▶️ Running Server_INTERPOLATION_TRAJECTORY.py...")
         db_sailing_times.process_and_clean_ais_data(start_date_str, end_date_str)
         print("✅ Cleaned Trajectory Segments completed.")
-        
+
         print("▶️ Running Server_interpolate_position_segments.py...")
         db_sailing_speed.interpolate_positions_from_cleaned_segments()
 
@@ -26,10 +26,6 @@ def run_scripts(start_date_str, end_date_str):
         db_designspeed.main()
         print("✅ Design Speed completed.")
 
-
-        
- 
-        
         print("▶️ Running Server_calculate_emissions.py...")
         subprocess.run([
             "python",

@@ -1,4 +1,3 @@
-#Server_output_mcr_aux_power.py
 import pandas as pd
 import psycopg2
 from sqlalchemy import create_engine
@@ -54,49 +53,56 @@ def main():
         "Barge": "Rest"
     }
 
-    def calculate_mcr_and_aux_power(engine_power, vessel_type_raw, length, breadth):
-        vessel_type = vessel_type_map.get(vessel_type_raw, "Rest")
+    # Buat kolom kategori utama
+    df['vessel_main_type'] = df['vessel_type'].map(vessel_type_map).fillna("Rest")
+
+    # Filter hanya Cargo dan Tanker
+    df_filtered = df[df['vessel_main_type'].isin(['Cargo', 'Tanker'])].copy()
+
+    # Fungsi perhitungan MCR & Aux Power
+    def calculate_mcr_and_aux_power(engine_power, vessel_type_main, length, breadth):
         if not length or not breadth:
             return (None, None)
+
         lw = length * breadth
-        if vessel_type == "Tanker":
-            mcr = 3.32e-5 * (lw)**2 + 0.27 * lw + 57.20
-        elif vessel_type == "Cargo":
+
+        # Validasi batasan berdasarkan scatter
+        if vessel_type_main == "Cargo" and (lw < 500 or lw > 12000):
+            return (None, None)
+        if vessel_type_main == "Tanker" and (lw < 300 or lw > 2500):
+            return (None, None)
+
+
+        if vessel_type_main == "Tanker":
+            mcr = 3.32e-4 * (lw)**2 + 0.27 * lw + 57.20
+        elif vessel_type_main == "Cargo":
             mcr = 7.52e-5 * (lw)**2 + 0.59 * lw - 41.48
         else:
-            mcr = 0  # fallback default
-        ratio = next((r[1] for r in ratio_data if r[0] == vessel_type), 0.22)
+            return (None, None)
+
+        ratio = next((r[1] for r in ratio_data if r[0] == vessel_type_main), 0.22)
         aux_power = mcr * ratio
         return (round(mcr, 2), round(aux_power, 2))
 
-    # Terapkan fungsi ke setiap baris, hasilkan dua kolom baru
-    mcr_aux_list = df.apply(
-        lambda row: calculate_mcr_and_aux_power(
+    # Terapkan fungsi ke setiap baris
+    df_filtered[['mcr', 'auxiliary_engine_power']] = df_filtered.apply(
+        lambda row: pd.Series(calculate_mcr_and_aux_power(
             row['engine_power'],
-            row['vessel_type'],
+            row['vessel_main_type'],
             row['length'],
             row['breadth']
-        ), axis=1
-    ).tolist()
-
-    # Buat DataFrame dari hasil apply
-    mcr_aux_df = pd.DataFrame(mcr_aux_list, columns=['mcr', 'auxiliary_engine_power'])
-
-    # Gabungkan ke df utama
-    df = pd.concat([df.reset_index(drop=True), mcr_aux_df], axis=1)
-
-    # Drop baris yang gagal dihitung (hasil None)
-    df = df[df['mcr'].notnull() & df['auxiliary_engine_power'].notnull()]
+        )), axis=1
+    )
 
     # Simpan ke PostgreSQL
     try:
         engine = create_engine("postgresql+psycopg2://postgres:Achmadriadi%40123@156.67.216.241:5432/emissionprojectdb")
-        df[['mmsi', 'vessel_type', 'mcr', 'auxiliary_engine_power']].to_sql(
+        df_filtered[['mmsi', 'vessel_type', 'mcr', 'auxiliary_engine_power']].to_sql(
             'output_mcr_and_aux_power', con=engine, if_exists='replace', index=False
         )
-        print("Data MCR dan Auxiliary Power berhasil disimpan ke PostgreSQL.")
+        print("✅ Data MCR dan Auxiliary Power berhasil disimpan ke PostgreSQL (tanpa Passenger dan Rest).")
     except Exception as e:
-        print(f"Gagal menyimpan ke PostgreSQL: {e}")
+        print(f"❌ Gagal menyimpan ke PostgreSQL: {e}")
 
 if __name__ == "__main__":
     main()
