@@ -832,3 +832,71 @@ def calculate_mmsi_average_emissions(mmsi):
 
     redis_client.setex(cache_key, 300, json.dumps(result))
     return result
+
+@require_GET
+def get_mmsi_count_by_ship_type(request):
+    ship_type = request.GET.get('ship_type', 'all')
+
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
+    )
+    cursor = conn.cursor()
+
+    if ship_type.lower() == 'all':
+        query = "SELECT COUNT(DISTINCT mmsi) FROM emission_output_final"
+        cursor.execute(query)
+    else:
+        query = """
+        SELECT COUNT(DISTINCT mmsi)
+        FROM emission_output_final
+        WHERE LOWER(vessel_type) = %s
+        """
+        cursor.execute(query, (ship_type.lower(),))
+
+    result = cursor.fetchone()
+    count = result[0] if result else 0
+
+    cursor.close()
+    conn.close()
+
+    return JsonResponse({'mmsi_count': count})
+
+
+@require_GET
+def filter_results_by_ship_type(request):
+    ship_type = request.GET.get('ship_type', 'all')
+
+    conn = psycopg2.connect(
+        dbname="emissionprojectdb",
+        user="postgres",
+        password="Achmadriadi@123",
+        host="156.67.216.241",
+        port="5432"
+    )
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    if ship_type.lower() == 'all':
+        cursor.execute("SELECT * FROM emission_output_final")
+    else:
+        cursor.execute("SELECT * FROM emission_output_final WHERE LOWER(vessel_type) = %s", (ship_type.lower(),))
+
+    data = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    # Hitung total emisi per jenis
+    totals = {
+        "CO2": sum(float(row["CO2"]) for row in data),
+        "NOX": sum(float(row["NOX"]) for row in data),
+        "CO": sum(float(row["CO"]) for row in data),
+        "NMVOC": sum(float(row["NMVOC"]) for row in data),
+        "PM": sum(float(row["PM"]) for row in data),
+        "SO2": sum(float(row["SO2"]) for row in data),
+        "mmsi_count": len(set(row["mmsi"] for row in data))
+    }
+
+    return JsonResponse(totals)

@@ -1187,3 +1187,58 @@
 
 </body>
 </html>
+
+<script>
+    $(document).ready(function () {
+        $('#ship-type').on('change', function () {
+            const selectedType = $(this).val();
+
+            $.ajax({
+                url: '/get_mmsi_count/',
+                type: 'GET',
+                data: { ship_type: selectedType },
+                success: function (data) {
+                    $('#mmsi-count').text(data.mmsi_count);
+                },
+                error: function () {
+                    $('#mmsi-count').text('Error');
+                }
+            });
+        });
+    });
+</script>
+
+<script>
+$(document).ready(function () {
+    $('#ship-type').on('change', function () {
+        const selectedType = $(this).val();
+
+        $.ajax({
+            url: '/filter_by_ship_type/',
+            type: 'GET',
+            data: { ship_type: selectedType },
+            success: function (data) {
+                $('#mmsi-count').text(data.mmsi_count);
+                $('#co2').text(data.CO2.toFixed(2) + " kg");
+                $('#nox').text(data.NOX.toFixed(2) + " kg");
+                $('#co').text(data.CO.toFixed(2) + " kg");
+                $('#nmovc').text(data.NMVOC.toFixed(2) + " kg");
+                $('#pm').text(data.PM.toFixed(2) + " kg");
+                $('#so2').text(data.SO2.toFixed(2) + " kg");
+            },
+            error: function () {
+                $('#mmsi-count').text("Error");
+            }
+        });
+    });
+});
+</script>
+
+<span id="mmsi-count"></span>
+<span id="co2"></span>
+<span id="nox"></span>
+<span id="co"></span>
+<span id="nmovc"></span>
+<span id="pm"></span>
+<span id="so2"></span>
+
