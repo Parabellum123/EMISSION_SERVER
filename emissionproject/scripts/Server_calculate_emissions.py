@@ -1,9 +1,8 @@
-#/root/emissionfolder/emissionproject/scripts/Server_calculate_emissions.py
 import os
 import sys
 from datetime import datetime
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, when, pow, lit, coalesce, to_timestamp
+from pyspark.sql.functions import col, when, pow, lit, coalesce, avg
 
 # 🔹 Konfigurasi PostgreSQL
 DB_HOST = os.getenv("POSTGRES_HOST", "156.67.216.241")
@@ -12,10 +11,10 @@ DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "Achmadriadi@123")
 DB_NAME = os.getenv("POSTGRES_DB", "emissionprojectdb")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 
-# 🔹 Path ke PostgreSQL JDBC Driver (Pastikan path driver sudah sesuai)
+# 🔹 Path ke PostgreSQL JDBC Driver
 POSTGRES_JAR_PATH = "/root/emissionfolder/myenv/jars/postgresql-42.7.5.jar"
 
-# 🔹 URL JDBC untuk PostgreSQL
+# 🔹 URL JDBC
 JDBC_URL = f"jdbc:postgresql://{DB_HOST}:{DB_PORT}/{DB_NAME}"
 CONNECTION_PROPERTIES = {
     "user": DB_USER,
@@ -43,30 +42,65 @@ def calculate_emissions(start_date, end_date):
         # 1️⃣ Load cleaned_trajectory_segments
         query_segment = f"""
         (SELECT * FROM cleaned_trajectory_segments
-        WHERE start_time BETWEEN '{start_date}' AND '{end_date}') AS seg        """
+        WHERE start_time BETWEEN '{start_date}' AND '{end_date}') AS seg
+        """
         segments_df = spark.read.jdbc(url=JDBC_URL, table=query_segment, properties=CONNECTION_PROPERTIES)
 
-        # 2️⃣ Load output_design_speed
+        # 2️⃣ Load interpolated_positions
+        interpolated_df = spark.read.jdbc(url=JDBC_URL, table="interpolated_positions", properties=CONNECTION_PROPERTIES) \
+            .withColumnRenamed("speed_q", "speed_q_mid") \
+            .withColumnRenamed("mid_time", "mid_time_interp")
+
+        # 3️⃣ Buang duration_hr > 1
+        segments_df = segments_df.filter((col("duration_hr") > 0) & (col("duration_hr") <= 1))
+
+        # 4️⃣ Proses segmen 0.1 < duration_hr <= 1 → ambil speed_q dari interpolated_positions
+        segments_mid = segments_df.filter((col("duration_hr") > 0.1) & (col("duration_hr") <= 1))
+
+        joined_df = segments_mid.alias("seg").join(
+            interpolated_df.alias("interp"),
+            (col("seg.mmsi") == col("interp.mmsi")) &
+            (col("interp.mid_time_interp") >= col("seg.start_time")) &
+            (col("interp.mid_time_interp") <= col("seg.end_time")),
+            how="left"
+        )
+
+        avg_speed_q = joined_df.groupBy("seg.mmsi", "seg.start_time", "seg.end_time") \
+            .agg(avg("speed_q_mid").alias("adjusted_speed_avg"))
+
+        # 5️⃣ Gabungkan kembali dan ganti speed_avg jika duration_hr > 0.1
+        segments_df = segments_df.alias("main").join(
+            avg_speed_q.alias("avg"),
+            (col("main.mmsi") == col("avg.mmsi")) &
+            (col("main.start_time") == col("avg.start_time")) &
+            (col("main.end_time") == col("avg.end_time")),
+            how="left"
+        ).withColumn(
+            "speed_avg",
+            when(col("main.duration_hr") > 0.1, coalesce(col("avg.adjusted_speed_avg"), col("main.speed_avg")))
+            .otherwise(col("main.speed_avg"))
+        ).select("main.*", "speed_avg")
+
+        # 6️⃣ Load data lainnya
         design_df = spark.read.jdbc(url=JDBC_URL, table="output_design_speed", properties=CONNECTION_PROPERTIES)
-
-        # 3️⃣ Load output_mcr_and_aux_power
         power_df = spark.read.jdbc(url=JDBC_URL, table="output_mcr_and_aux_power", properties=CONNECTION_PROPERTIES)
-
-        # 4️⃣ Load emission_factor_machine_type
         ef_df = spark.read.jdbc(url=JDBC_URL, table="emission_factor_machine_type", properties=CONNECTION_PROPERTIES)
 
-        print("✅ Semua data berhasil dimuat dari PostgreSQL")
+        print("✅ Semua data berhasil dimuat dan difilter")
 
-        # 5️⃣ Join semua data berdasarkan MMSI
+        # 7️⃣ Join semua data berdasarkan MMSI
         df = segments_df \
-            .join(design_df, on="mmsi", how="INNER") \
-            .join(power_df, on="mmsi", how="INNER") \
+            .join(design_df, on="mmsi", how="inner") \
+            .join(power_df, on="mmsi", how="inner") \
             .crossJoin(ef_df)
 
-        # 6️⃣ Hitung load_ratio = AS / MS
+        # 8️⃣ Filter: hanya speed_avg < design_speed
+        df = df.filter(col("speed_avg") < col("design_speed"))
+
+        # 9️⃣ Hitung load_ratio = speed_avg / design_speed
         df = df.withColumn("load_ratio", col("speed_avg") / col("design_speed"))
 
-        # 7️⃣ Hitung Emisi
+        # 🔟 Hitung Emisi
         emissions = ["CO2", "NOX", "CO", "NMVOC", "PM", "SO2"]
         for gas in emissions:
             df = df.withColumn(gas,
@@ -78,11 +112,11 @@ def calculate_emissions(start_date, end_date):
                 )
             )
 
-        # 8️⃣ Tangani Null
+        # 11️⃣ Tangani Null
         for gas in emissions:
             df = df.withColumn(gas, coalesce(col(gas), lit(0)))
 
-        # 9️⃣ Simpan ke PostgreSQL
+        # 12️⃣ Simpan ke emission_output_final
         result = df.select(
             "mmsi", col("vessel_type_ap").alias("vessel_type"),
             col("start_time").alias("start_timestamp"),
@@ -95,10 +129,8 @@ def calculate_emissions(start_date, end_date):
             "mcr", "auxiliary_engine_power", *emissions
         )
 
-
         result.write.jdbc(url=JDBC_URL, table="emission_output_final", mode="overwrite", properties=CONNECTION_PROPERTIES)
         print("✅ Emisi berhasil disimpan ke tabel 'emission_output_final'")
-
         print(f"✅ Total baris: {result.count()}")
 
     except Exception as e:
@@ -107,6 +139,7 @@ def calculate_emissions(start_date, end_date):
     finally:
         spark.stop()
         print("🔄 Spark session ditutup")
+
 
 # 🔹 Eksekusi Program
 if __name__ == "__main__":
