@@ -94,9 +94,35 @@ def calculate_emissions(start_date, end_date):
             .join(power_df, on="mmsi", how="inner") \
             .crossJoin(ef_df)
 
-        # 8️⃣ Filter: hanya speed_avg < design_speed
+        # 8️⃣ Filter: hanya speed_avg < design_speed & activity
         df = df.filter(col("speed_avg") < col("design_speed"))
 
+        # Tambahkan ini setelah memuat emission_factor_machine_type
+        ae_ratio_df = spark.read.jdbc(url=JDBC_URL, table="auxiliary_engine_load_factor_assumptions", properties=CONNECTION_PROPERTIES)
+
+        # Join df dengan ae_ratio_df untuk mengambil rasio AE berdasarkan vessel_type
+        df = df.join(ae_ratio_df, df["vessel_type_ap"] == ae_ratio_df["ship_type"], how="left")
+
+        # Update kolom aktivitas
+        df = df.withColumn("activity",
+            when(col("speed_avg") <= 1, lit("Mooring"))
+            .when((col("speed_avg") > 1) & (col("speed_avg") <= 3), lit("Maneuver"))
+            .otherwise(lit("Cruising"))
+        )
+
+        # Update ME ratio sesuai tabel
+        df = df.withColumn("me_ratio",
+            when(col("activity") == "Mooring", lit(0.0))
+            .when(col("activity") == "Maneuver", lit(0.4))
+            .otherwise(lit(0.8))  # Cruising
+        )
+
+        # AE ratio dari tabel berdasarkan aktivitas
+        df = df.withColumn("ae_ratio",
+            when(col("activity") == "Mooring", col("mooring_ratio"))
+            .when(col("activity") == "Maneuver", col("maneuvering_ratio"))
+            .otherwise(col("sailing_ratio"))
+        )
         # 9️⃣ Hitung load_ratio = speed_avg / design_speed
         df = df.withColumn("load_ratio", col("speed_avg") / col("design_speed"))
 
@@ -104,13 +130,14 @@ def calculate_emissions(start_date, end_date):
         emissions = ["CO2", "NOX", "CO", "NMVOC", "PM", "SO2"]
         for gas in emissions:
             df = df.withColumn(gas,
-                when(col("speed_avg") > 3,
-                    ((col("mcr") * pow(col("load_ratio"), 3) * col("duration_hr") * col(f"main_engine_emission_{gas}") +
-                    col("auxiliary_engine_power") * col("duration_hr") * col(f"auxiliary_engine_emission_{gas}")) / 1000))
-                .otherwise(
-                    (col("auxiliary_engine_power") * col("duration_hr") * col(f"auxiliary_engine_emission_{gas}") / 1000)
-                )
-            )
+            (
+                # Emisi dari Main Engine berdasarkan MCR dan rasio aktivitas
+                col("mcr") * col("me_ratio") * pow(col("load_ratio"), 3) * col("duration_hr") * col(f"main_engine_emission_{gas}")
+                +
+                # Emisi dari AE berdasarkan AE power dan rasio aktivitas
+                col("auxiliary_engine_power") * col("ae_ratio") * col("duration_hr") * col(f"auxiliary_engine_emission_{gas}")
+            ) / 1000  # konversi dari gram ke kg
+        )
 
         # 11️⃣ Tangani Null
         for gas in emissions:
