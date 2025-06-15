@@ -73,9 +73,15 @@ def main():
     df2 = pd.read_sql(query2, conn)
     df2['design_speed_max'] = df2['max_speed'] / 0.94
 
+
     # Gabungkan kedua hasil berdasarkan mmsi
     df_final = pd.merge(df1[['mmsi', 'vessel_type_ap', 'design_speed_mcr']], df2[['mmsi', 'design_speed_max']], on='mmsi', how='outer')
-    df_final['design_speed'] = df_final[['design_speed_mcr', 'design_speed_max']].max(axis=1)
+
+    # Tambahkan kolom default_speed
+    df_final['default_speed'] = 15.0
+
+    # Pergabuangan
+    df_final['design_speed'] = df_final[['design_speed_mcr', 'design_speed_max', 'default_speed']].max(axis=1)
 
     # Filter: hanya baris yang design_speed_mcr ≠ 0 dan design_speed_max ≠ 0
     df_final = df_final[

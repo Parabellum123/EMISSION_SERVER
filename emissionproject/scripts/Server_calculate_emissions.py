@@ -2,7 +2,8 @@ import os
 import sys
 from datetime import datetime
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, when, pow, lit, coalesce, avg
+from pyspark.sql.functions import col, when, pow, lit, coalesce, avg, floor
+
 
 # 🔹 Konfigurasi PostgreSQL
 DB_HOST = os.getenv("POSTGRES_HOST", "156.67.216.241")
@@ -123,20 +124,22 @@ def calculate_emissions(start_date, end_date):
             .when(col("activity") == "Maneuver", col("maneuvering_ratio"))
             .otherwise(col("sailing_ratio"))
         )
-        # 9️⃣ Hitung load_ratio = speed_avg / design_speed
-        df = df.withColumn("load_ratio", col("speed_avg") / col("design_speed"))
+        # 9️⃣ Hitung load_factor = speed_avg / design_speed
+        
+        df = df.withColumn("LOAD_FACTOR", pow(col("speed_avg") / col("design_speed"), 3))
+        
+        # 🔟 Hitung Emisi dengan koreksi AE berdasarkan LOAD_FACTOR
 
-        # 🔟 Hitung Emisi
         emissions = ["CO2", "NOX", "CO", "NMVOC", "PM", "SO2"]
         for gas in emissions:
             df = df.withColumn(gas,
             (
                 # Emisi dari Main Engine berdasarkan MCR dan rasio aktivitas
-                col("mcr") * col("me_ratio") * pow(col("load_ratio"), 3) * col("duration_hr") * col(f"main_engine_emission_{gas}")
+                col("mcr") * col("me_ratio") *pow(col("speed_avg") / col("design_speed"), 3) * col("duration_hr") * col(f"main_engine_emission_{gas}")
                 +
                 # Emisi dari AE berdasarkan AE power dan rasio aktivitas
                 col("auxiliary_engine_power") * col("ae_ratio") * col("duration_hr") * col(f"auxiliary_engine_emission_{gas}")
-            ) / 1000  # konversi dari gram ke kg
+            ) / 1000000  # konversi dari gram ke ton
         )
 
         # 11️⃣ Tangani Null
@@ -152,7 +155,7 @@ def calculate_emissions(start_date, end_date):
             col("lon_start").alias("start_longitude"),
             col("lat_end").alias("end_latitude"),
             col("lon_end").alias("end_longitude"),
-            "speed_avg", "design_speed", "duration_hr", "load_ratio",
+            "speed_avg", "design_speed", "duration_hr", "LOAD_FACTOR",
             "mcr", "auxiliary_engine_power", *emissions
         )
 
