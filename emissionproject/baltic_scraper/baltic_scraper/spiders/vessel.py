@@ -28,11 +28,7 @@ def get_new_vessels(engine):
     query = '''
         SELECT a.mmsi, a.imo
         FROM ais_vessel a
-        LEFT JOIN scraping_data v ON a.imo = v.imo_number
-        WHERE a.imo IS NOT NULL 
-        AND a.imo != 0 
-        AND a.mmsi IS NOT NULL
-        AND v.imo_number IS NULL;
+        WHERE a.imo IS NOT NULL AND a.imo != 0 AND a.mmsi IS NOT NULL;
     '''
     df = pd.read_sql(query, engine)
     if df.empty:
@@ -84,6 +80,7 @@ def scrape_vessel_data(vessel_list, driver):
         vessel_type = "-"
         length = 0
         breadth = 0
+        flag = "-"
 
         for attempt in range(retries):
             try:
@@ -123,6 +120,8 @@ def scrape_vessel_data(vessel_list, driver):
                             length = clean_text(value)
                         elif "Breadth" in header:
                             breadth = clean_text(value)
+                        elif "Flag" in header:
+                            flag = value
                 except:
                     pass
 
@@ -141,7 +140,8 @@ def scrape_vessel_data(vessel_list, driver):
             "engine_power": engine_power,
             "vessel_type": vessel_type,
             "length": length,
-            "breadth": breadth
+            "breadth": breadth,
+            "flag": flag
         })
 
     return scraped_data
@@ -164,12 +164,12 @@ def save_to_database(data, engine):
                     INSERT INTO scraping_data (
                         mmsi, imo_number, vessel_name, deadweight,
                         engine_type, engine_model, engine_power,
-                        vessel_type, length, breadth
+                        vessel_type, length, breadth, flag
                     )
                     VALUES (
                         :mmsi, :imo_number, :vessel_name, :deadweight,
                         :engine_type, :engine_model, :engine_power,
-                        :vessel_type, :length, :breadth
+                        :vessel_type, :length, :breadth, :flag
                     )
                     ON CONFLICT (imo_number) DO UPDATE SET
                         vessel_name = EXCLUDED.vessel_name,
@@ -179,7 +179,8 @@ def save_to_database(data, engine):
                         engine_power = EXCLUDED.engine_power,
                         vessel_type = EXCLUDED.vessel_type,
                         length = EXCLUDED.length,
-                        breadth = EXCLUDED.breadth;
+                        breadth = EXCLUDED.breadth,
+                        flag = EXCLUDED.flag;
                 """)
                 conn.execute(query, row.to_dict())
 

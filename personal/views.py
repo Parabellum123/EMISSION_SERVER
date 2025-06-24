@@ -1,6 +1,7 @@
 #/root/emissionfolder/personal/views.py
 from django.shortcuts import render
 from django.http import JsonResponse
+from django.db import connection
 from django.views.decorators.http import require_GET
 from django.template.loader import render_to_string
 from emissionproject.scripts.calculations import run_scripts
@@ -265,7 +266,7 @@ def fetch_ship_data(mmsi):
         # Coba ambil data kapal dengan kondisi panjang > lebar (optional logic)
         query = """
         SELECT mmsi, imo_number, vessel_name, vessel_type, length, breadth AS width, draught,
-               engine_type, engine_model, engine_power, deadweight
+               engine_type, engine_model, engine_power, deadweight, flag
         FROM vessel_data
         WHERE mmsi = %s AND length > breadth
         LIMIT 1
@@ -278,7 +279,7 @@ def fetch_ship_data(mmsi):
             # Fallback jika tidak ditemukan
             query = """
             SELECT mmsi, imo_number, vessel_name, vessel_type, length, breadth AS width, draught,
-                   engine_type, engine_model, engine_power, deadweight
+                   engine_type, engine_model, engine_power, deadweight, flag
             FROM vessel_data
             WHERE mmsi = %s
             LIMIT 1
@@ -292,6 +293,7 @@ def fetch_ship_data(mmsi):
 
             result['name'] = result.pop('vessel_name', 'N/A')
             result['imo'] = result.pop('imo_number', 'N/A')
+            result['flag'] = result.get('flag', '-')  # ⬅️ tambahkan baris ini
             print("DEBUG Final Result:", result)
         else:
             result = {}
@@ -486,7 +488,7 @@ def fetch_total_daily_data():
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     query = """
     SELECT date, 
-        "total_CO2", "open_CO2", "close_CO2", "high_CO2", "low_CO2",
+        "total_CO2", "open_CO2", "close_CO2", "high_CO2", "low_CO",
         "total_NOX", "open_NOX", "close_NOX", "high_NOX", "low_NOX",
         "total_CO", "open_CO", "close_CO", "high_CO", "low_CO",
         "total_NMVOC", "open_NMVOC", "close_NMVOC", "high_NMVOC", "low_NMVOC",
@@ -733,7 +735,7 @@ def fetch_ship_data(mmsi):
     try:
         query = """
         SELECT mmsi, imo_number, vessel_name, vessel_type, length, breadth AS width, draught,
-               engine_type, engine_model, engine_power, deadweight
+               engine_type, engine_model, engine_power, deadweight, flag
         FROM vessel_data
         WHERE mmsi = %s AND length > breadth
         LIMIT 1
@@ -743,7 +745,7 @@ def fetch_ship_data(mmsi):
         if not row:
             query = """
             SELECT mmsi, imo_number, vessel_name, vessel_type, length, breadth AS width, draught,
-                   engine_type, engine_model, engine_power, deadweight
+                   engine_type, engine_model, engine_power, deadweight, flag
             FROM vessel_data
             WHERE mmsi = %s
             LIMIT 1
@@ -754,6 +756,7 @@ def fetch_ship_data(mmsi):
             result = dict(row)
             result['name'] = result.pop('vessel_name', 'N/A')
             result['imo'] = result.pop('imo_number', 'N/A')
+            result['flag'] = result.get('flag', '-')  # ⬅️ tambahkan baris ini
         else:
             result = {}
     finally:
@@ -779,7 +782,7 @@ def fetch_candlestick_data():
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     query = """
     SELECT date, 
-        "total_CO2", "open_CO2", "close_CO2", "high_CO2", "low_CO2", 
+        "total_CO2", "open_CO2", "close_CO2", "high_CO2", "low_CO", 
         "total_NOX", "open_NOX", "close_NOX", "high_NOX", "low_NOX", 
         "total_CO", "open_CO", "close_CO", "high_CO", "low_CO", 
         "total_NMVOC", "open_NMVOC", "close_NMVOC", "high_NMVOC", "low_NMVOC", 
@@ -900,3 +903,25 @@ def filter_results_by_ship_type(request):
     }
 
     return JsonResponse(totals)
+
+def flag_statistics(request):
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT v.flag, COUNT(DISTINCT v.mmsi)
+            FROM vessel_data v
+            WHERE v.flag IS NOT NULL AND v.flag != ''
+              AND v.mmsi IN (
+                SELECT DISTINCT mmsi FROM emission_output_final
+              )
+            GROUP BY v.flag
+            ORDER BY COUNT(*) DESC
+        """)
+        rows = cursor.fetchall()
+
+    flags = [r[0] for r in rows]
+    counts = [r[1] for r in rows]
+
+    return render(request, 'base.html', {
+        'flags': json.dumps(flags, ensure_ascii=False),
+        'counts': json.dumps(counts),
+    })

@@ -149,6 +149,7 @@
         </div>
     </header>
 
+    
     <!-- Main Content -->
     <div class="container mx-auto mt-8 p-4">
         <div class="flex">
@@ -371,6 +372,7 @@
                     <p><strong>MMSI:</strong> <span id="ship-mmsi"></span></p>
                     <p><strong>Name:</strong> <span id="ship-name"></span></p>
                     <p><strong>IMO:</strong> <span id="ship-imo"></span></p>
+                    <p><strong>Flag:</strong> <span id="ship-flag"></span></p>
                     <p><strong>Vessel Type:</strong> <span id="ship-vessel-type"></span></p>
                     <p><strong>Length:</strong> <span id="ship-length"></span></p>
                     <p><strong>Width:</strong> <span id="ship-width"></span></p>
@@ -532,6 +534,7 @@
                     $('#ship-vessel-type').text(data.ship_vessel_type);
                     $('#ship-length').text(data.ship_length);
                     $('#ship-width').text(data.ship_width);
+                    $('#ship-flag').text(data.ship_flag);
 
                     $('#emission-table').html(data.emission_table_html);
                     $('#selected-mmsi-emission-table').html(data.selected_mmsi_table_html);
@@ -679,6 +682,7 @@
                     $('#ship-vessel-type').text(data.ship_data.vessel_type || 'N/A');
                     $('#ship-length').text(data.ship_data.length || 'N/A');
                     $('#ship-width').text(data.ship_data.width || 'N/A');
+                    $('#ship-flag').text(data.ship_data.flag || 'N/A');
 
                     // Update MMSI Emission Data table
                     $('#mmsi-emission-table').html(data.mmsi_emission_table_html);
@@ -849,6 +853,7 @@
             $('#ship-vessel-type').text('');
             $('#ship-length').text('');
             $('#ship-width').text('');
+            $('#ship-flag').text('');
 
             $('#mmsi-total-co2').text('0');
             $('#mmsi-total-nox').text('0');
@@ -1242,3 +1247,59 @@ $(document).ready(function () {
 <span id="pm"></span>
 <span id="so2"></span>
 
+<script>
+document.getElementById("load-emission").addEventListener("click", function () {
+    fetch('/load_emission_data/')
+        .then(response => response.json())
+        .then(percentages => {
+            updateDoughnutChart(percentages);
+        })
+        .catch(error => {
+            console.error("Gagal mengambil data emisi:", error);
+        });
+});
+
+function updateDoughnutChart(percentages) {
+    const ctx = document.getElementById('emission-percentage-chart').getContext('2d');
+    const data = [
+        percentages.CO2 || 0,
+        percentages.NOX || 0,
+        percentages.CO || 0,
+        percentages.NMVOC || 0,
+        percentages.PM || 0,
+        percentages.SO2 || 0
+    ];
+    createDoughnutChart(ctx, data);
+}
+
+function createDoughnutChart(ctx, data) {
+    if (window.myDoughnutChart) {
+        window.myDoughnutChart.destroy();  // hapus chart lama jika ada
+    }
+    window.myDoughnutChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['CO₂', 'NOₓ', 'CO', 'NMVOC', 'PM', 'SO₂'],
+            datasets: [{
+                data: data,
+                backgroundColor: [
+                    '#36A2EB',
+                    '#FF6384',
+                    '#FFCE56',
+                    '#4BC0C0',
+                    '#9966FF',
+                    '#FF9F40'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+</script>

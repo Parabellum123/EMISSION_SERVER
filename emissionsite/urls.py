@@ -16,5 +16,6 @@ urlpatterns = [
     path('update_vessel/', views.update_vessel, name='update_vessel'),  # ✅ Tambahkan ini
     path('get_mmsi_count/', get_mmsi_count_by_ship_type, name='get_mmsi_count_by_ship_type'),
     path('filter_by_ship_type/', filter_results_by_ship_type, name='filter_results_by_ship_type'),
+    path('flag-statistics/', views.flag_statistics, name='flag_statistics')
 ]
 
