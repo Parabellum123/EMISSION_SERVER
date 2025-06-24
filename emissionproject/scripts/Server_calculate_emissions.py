@@ -142,11 +142,48 @@ def calculate_emissions(start_date, end_date):
             ) / 1000000  # konversi dari gram ke ton
         )
 
-        # 11️⃣ Tangani Null
+        # 1️⃣1️⃣ Load emission_correction_factor
+        correction_df = spark.read.jdbc(url=JDBC_URL, table="emission_correction_factor", properties=CONNECTION_PROPERTIES)
+
+        # 1️⃣2️⃣ Floor load_factor ke bawah agar bisa join (hanya jika ≤ 0.2)
+        from pyspark.sql.functions import format_number
+
+        df = df.withColumn("load_floor",
+            when(col("LOAD_FACTOR") <= 0.02, lit(0.01))
+            .when(col("LOAD_FACTOR") <= 0.2, floor(col("LOAD_FACTOR") * 100) / 100)
+        )
+
+        df = df.withColumn("load_floor_str", format_number(col("load_floor"), 2))
+        correction_df = correction_df.withColumn("load_str", format_number(col("load"), 2))
+
+        # 1️⃣3️⃣ Join dengan koreksi (LEFT)
+        df = df.join(correction_df, df.load_floor_str == correction_df.load_str, how="left")
+
+        # 1️⃣4️⃣ Terapkan koreksi: jika load_factor > 0.2, faktor = 1.0
+        for gas in emissions:
+            df = df.withColumn(f"{gas}_factor",
+                when(col("LOAD_FACTOR") <= 0.2, coalesce(col(f"{gas}_correction"), lit(1.0)))
+                .otherwise(lit(1.0))
+            )
+
+
+        # 1️⃣5️⃣ Hitung emisi final setelah koreksi
+        for gas in emissions:
+            df = df.withColumn(f"{gas}_base",
+                (
+                    col("mcr") * col("me_ratio") * pow(col("speed_avg") / col("design_speed"), 3) * col("duration_hr") * col(f"main_engine_emission_{gas}")
+                    +
+                    col("auxiliary_engine_power") * col("ae_ratio") * col("duration_hr") * col(f"auxiliary_engine_emission_{gas}")
+                ) / 1000000
+            )
+
+            df = df.withColumn(gas, col(f"{gas}_base") * col(f"{gas}_factor"))
+
+        # 1️⃣6️⃣ Tangani null
         for gas in emissions:
             df = df.withColumn(gas, coalesce(col(gas), lit(0)))
 
-        # 12️⃣ Simpan ke emission_output_final
+        # 1️⃣7️⃣ Simpan ke emission_output_final
         result = df.select(
             "mmsi", col("vessel_type_ap").alias("vessel_type"),
             col("start_time").alias("start_timestamp"),
@@ -158,33 +195,12 @@ def calculate_emissions(start_date, end_date):
             "speed_avg", "design_speed", "duration_hr", "LOAD_FACTOR",
             "mcr", "auxiliary_engine_power", *emissions
         )
+    
+        df.filter(col("LOAD_FACTOR") <= 0.2).select("LOAD_FACTOR", "load_floor", "load_floor_str", "CO2_correction").show(20, False)
+
 
         result.write.jdbc(url=JDBC_URL, table="emission_output_final", mode="overwrite", properties=CONNECTION_PROPERTIES)
         print("✅ Emisi berhasil disimpan ke tabel 'emission_output_final'")
         print(f"✅ Total baris: {result.count()}")
-
     except Exception as e:
         print(f"❌ Terjadi kesalahan: {e}")
-        sys.exit(1)
-    finally:
-        spark.stop()
-        print("🔄 Spark session ditutup")
-
-
-# 🔹 Eksekusi Program
-if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python calculate_emissions_postgres.py 'YYYY-MM-DD' 'YYYY-MM-DD'")
-        sys.exit(1)
-
-    start_date_str = sys.argv[1]
-    end_date_str = sys.argv[2]
-
-    try:
-        start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-        end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-    except ValueError:
-        print("❌ Format tanggal harus 'YYYY-MM-DD'")
-        sys.exit(1)
-
-    calculate_emissions(start_date_str, end_date_str)

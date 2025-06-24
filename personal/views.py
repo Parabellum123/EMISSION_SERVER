@@ -2,6 +2,7 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.db import connection
+from django.db import connection
 from django.views.decorators.http import require_GET
 from django.template.loader import render_to_string
 from emissionproject.scripts.calculations import run_scripts
@@ -488,7 +489,7 @@ def fetch_total_daily_data():
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     query = """
     SELECT date, 
-        "total_CO2", "open_CO2", "close_CO2", "high_CO2", "low_CO",
+        "total_CO2", "open_CO2", "close_CO2", "high_CO2", "low_CO2",
         "total_NOX", "open_NOX", "close_NOX", "high_NOX", "low_NOX",
         "total_CO", "open_CO", "close_CO", "high_CO", "low_CO",
         "total_NMVOC", "open_NMVOC", "close_NMVOC", "high_NMVOC", "low_NMVOC",
@@ -782,7 +783,7 @@ def fetch_candlestick_data():
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     query = """
     SELECT date, 
-        "total_CO2", "open_CO2", "close_CO2", "high_CO2", "low_CO", 
+        "total_CO2", "open_CO2", "close_CO2", "high_CO2", "low_CO2", 
         "total_NOX", "open_NOX", "close_NOX", "high_NOX", "low_NOX", 
         "total_CO", "open_CO", "close_CO", "high_CO", "low_CO", 
         "total_NMVOC", "open_NMVOC", "close_NMVOC", "high_NMVOC", "low_NMVOC", 
